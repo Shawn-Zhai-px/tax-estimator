@@ -1,0 +1,168 @@
+/**
+ * Tax bracket & deduction reference data.
+ *
+ * IMPORTANT: This data is for the 2025 tax year (return filed in 2026) and is
+ * kept for REFERENCE / ESTIMATION purposes only. It is not tax advice and is
+ * not guaranteed to be complete, current, or applicable to any individual's
+ * situation. Always confirm numbers against the IRS / your state's tax
+ * authority, or consult a licensed tax professional, before relying on them.
+ *
+ * Sources (retrieved August 2026):
+ * - Federal brackets & standard deduction: IRS Rev. Proc. 2024-40, as
+ *   amended by the One Big Beautiful Bill Act (OBBBA) 2025 standard
+ *   deduction increase. See https://www.irs.gov and https://taxfoundation.org/data/all/federal/2025-tax-brackets/
+ * - California brackets & standard deduction: CA FTB 2025 Form 540 tax rate
+ *   schedules, https://www.ftb.ca.gov/forms/2025/2025-540-tax-rate-schedules.pdf
+ * - Texas: no state personal income tax.
+ */
+
+export type FilingStatus = "single" | "mfj" | "hoh" | "mfs";
+
+export type StateCode = "CA" | "TX";
+
+export interface TaxBracket {
+  /** Lower bound of this bracket (inclusive), in dollars of taxable income. */
+  min: number;
+  /** Upper bound of this bracket (exclusive). `null` means "and above". */
+  max: number | null;
+  /** Marginal rate applied to the slice of income within this bracket. */
+  rate: number;
+}
+
+export const TAX_YEAR = 2025;
+
+export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
+  single: "Single",
+  mfj: "Married Filing Jointly",
+  hoh: "Head of Household",
+  mfs: "Married Filing Separately",
+};
+
+// ---------------------------------------------------------------------------
+// Federal (IRS) — Tax Year 2025
+// ---------------------------------------------------------------------------
+
+export const FEDERAL_STANDARD_DEDUCTION: Record<FilingStatus, number> = {
+  single: 15750,
+  mfj: 31500,
+  hoh: 23625,
+  mfs: 15750,
+};
+
+export const FEDERAL_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
+  single: [
+    { min: 0, max: 11925, rate: 0.1 },
+    { min: 11925, max: 48475, rate: 0.12 },
+    { min: 48475, max: 103350, rate: 0.22 },
+    { min: 103350, max: 197300, rate: 0.24 },
+    { min: 197300, max: 250525, rate: 0.32 },
+    { min: 250525, max: 626350, rate: 0.35 },
+    { min: 626350, max: null, rate: 0.37 },
+  ],
+  mfj: [
+    { min: 0, max: 23850, rate: 0.1 },
+    { min: 23850, max: 96950, rate: 0.12 },
+    { min: 96950, max: 206700, rate: 0.22 },
+    { min: 206700, max: 394600, rate: 0.24 },
+    { min: 394600, max: 501050, rate: 0.32 },
+    { min: 501050, max: 751600, rate: 0.35 },
+    { min: 751600, max: null, rate: 0.37 },
+  ],
+  hoh: [
+    { min: 0, max: 17000, rate: 0.1 },
+    { min: 17000, max: 64850, rate: 0.12 },
+    { min: 64850, max: 103350, rate: 0.22 },
+    { min: 103350, max: 197300, rate: 0.24 },
+    { min: 197300, max: 250500, rate: 0.32 },
+    { min: 250500, max: 626350, rate: 0.35 },
+    { min: 626350, max: null, rate: 0.37 },
+  ],
+  // MFS brackets are exactly half of the MFJ brackets at every threshold.
+  mfs: [
+    { min: 0, max: 11925, rate: 0.1 },
+    { min: 11925, max: 48475, rate: 0.12 },
+    { min: 48475, max: 103350, rate: 0.22 },
+    { min: 103350, max: 197300, rate: 0.24 },
+    { min: 197300, max: 250525, rate: 0.32 },
+    { min: 250525, max: 375800, rate: 0.35 },
+    { min: 375800, max: null, rate: 0.37 },
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// California (FTB) — Tax Year 2025
+// ---------------------------------------------------------------------------
+
+export const CA_STANDARD_DEDUCTION: Record<FilingStatus, number> = {
+  single: 5706,
+  mfj: 11412,
+  hoh: 11412,
+  mfs: 5706,
+};
+
+// CA Schedule X (Single / MFS)
+const CA_SCHEDULE_X: TaxBracket[] = [
+  { min: 0, max: 11079, rate: 0.01 },
+  { min: 11079, max: 26264, rate: 0.02 },
+  { min: 26264, max: 41452, rate: 0.04 },
+  { min: 41452, max: 57542, rate: 0.06 },
+  { min: 57542, max: 72724, rate: 0.08 },
+  { min: 72724, max: 371479, rate: 0.093 },
+  { min: 371479, max: 445771, rate: 0.103 },
+  { min: 445771, max: 742953, rate: 0.113 },
+  { min: 742953, max: null, rate: 0.123 },
+];
+
+// CA Schedule Y (Married/RDP Filing Jointly or Qualifying Surviving Spouse)
+const CA_SCHEDULE_Y: TaxBracket[] = [
+  { min: 0, max: 22158, rate: 0.01 },
+  { min: 22158, max: 52528, rate: 0.02 },
+  { min: 52528, max: 82904, rate: 0.04 },
+  { min: 82904, max: 115084, rate: 0.06 },
+  { min: 115084, max: 145448, rate: 0.08 },
+  { min: 145448, max: 742958, rate: 0.093 },
+  { min: 742958, max: 891542, rate: 0.103 },
+  { min: 891542, max: 1485906, rate: 0.113 },
+  { min: 1485906, max: null, rate: 0.123 },
+];
+
+// CA Schedule Z (Head of Household)
+const CA_SCHEDULE_Z: TaxBracket[] = [
+  { min: 0, max: 22173, rate: 0.01 },
+  { min: 22173, max: 52530, rate: 0.02 },
+  { min: 52530, max: 67716, rate: 0.04 },
+  { min: 67716, max: 83805, rate: 0.06 },
+  { min: 83805, max: 98990, rate: 0.08 },
+  { min: 98990, max: 505208, rate: 0.093 },
+  { min: 505208, max: 606251, rate: 0.103 },
+  { min: 606251, max: 1010417, rate: 0.113 },
+  { min: 1010417, max: null, rate: 0.123 },
+];
+
+export const CA_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
+  single: CA_SCHEDULE_X,
+  mfs: CA_SCHEDULE_X,
+  mfj: CA_SCHEDULE_Y,
+  hoh: CA_SCHEDULE_Z,
+};
+
+/** CA Mental Health Services Tax: additional 1% on taxable income over $1,000,000. */
+export const CA_MENTAL_HEALTH_TAX_THRESHOLD = 1_000_000;
+export const CA_MENTAL_HEALTH_TAX_RATE = 0.01;
+
+/**
+ * NOTE on scope (documented so the "assumptions" shown in the app are honest):
+ * - CA personal/dependent exemption CREDITS (a small credit, roughly $150–$300
+ *   depending on filing status, subtracted from tax owed rather than from
+ *   income) are NOT applied in this MVP. Omitting them makes the CA estimate
+ *   slightly conservative (i.e., a slight overestimate of CA tax owed).
+ * - Neither calculation includes payroll taxes (Social Security/Medicare),
+ *   the CA SDI payroll tax, the Additional Medicare Tax, self-employment
+ *   tax, the Net Investment Income Tax, AMT, or any credits (Child Tax
+ *   Credit, EITC, etc.) beyond the standard deduction.
+ */
+
+export const STATES: { code: StateCode; label: string }[] = [
+  { code: "CA", label: "California" },
+  { code: "TX", label: "Texas (no state income tax)" },
+];
