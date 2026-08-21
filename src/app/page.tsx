@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
 import TaxForm, { TaxFormValues } from "@/components/TaxForm";
@@ -36,13 +37,18 @@ export default function Home() {
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-          Federal &amp; State Income Tax Estimator
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          联邦及州个人所得税估算工具（目前支持加州 CA / 德州 TX）— 仅供参考，非税务建议。
-        </p>
+      <header className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+            Federal &amp; State Income Tax Estimator
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            联邦及州个人所得税估算工具（目前支持加州 CA / 德州 TX）— 仅供参考，非税务建议。
+          </p>
+        </div>
+        <Link href="/paycheck-withholding" className="text-sm text-brand-600 hover:underline">
+          Paycheck withholding calculator →
+        </Link>
       </header>
 
       <div className="mb-6">
