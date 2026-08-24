@@ -117,4 +117,21 @@ export const TAX_DATA_2025: YearTaxData = {
   },
   caMentalHealthTaxThreshold: 1_000_000,
   caMentalHealthTaxRate: 0.01,
+  // SSA: 2025 Social Security wage base (taxable maximum) is $176,100.
+  ssWageBase: 176_100,
+  // IRS Pub 972 / OBBBA: 2025 Child Tax Credit is $2,200/child; Credit for
+  // Other Dependents is $500; both phase out $50 per $1,000 of MAGI over
+  // $400,000 (MFJ) / $200,000 (other statuses).
+  childTaxCredit: 2200,
+  otherDependentCredit: 500,
+  ctcPhaseOutThresholdMfj: 400_000,
+  ctcPhaseOutThresholdOther: 200_000,
+  // IRC §221 / IRS Topic 456: 2025 student loan interest deduction, $2,500
+  // max, phases out $85,000-$100,000 MAGI (Single/HoH) or $170,000-$200,000
+  // (MFJ). Not available at all for Married Filing Separately.
+  studentLoanInterestMax: 2500,
+  studentLoanPhaseOut: {
+    singleHoh: { lower: 85_000, upper: 100_000 },
+    mfj: { lower: 170_000, upper: 200_000 },
+  },
 };

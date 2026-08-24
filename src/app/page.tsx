@@ -16,6 +16,10 @@ const DEFAULT_VALUES: TaxFormValues = {
   state: "CA",
   useItemized: false,
   itemizedDeduction: "",
+  selfEmploymentNetIncome: "",
+  qualifyingChildren: "",
+  otherDependents: "",
+  studentLoanInterestPaid: "",
 };
 
 type Step = "input" | "results";
@@ -37,6 +41,10 @@ export default function Home() {
       state: values.state,
       taxYear: values.taxYear,
       itemizedDeduction,
+      selfEmploymentNetIncome: Number(values.selfEmploymentNetIncome) || 0,
+      qualifyingChildren: Number(values.qualifyingChildren) || 0,
+      otherDependents: Number(values.otherDependents) || 0,
+      studentLoanInterestPaid: Number(values.studentLoanInterestPaid) || 0,
     });
   }, [values]);
 

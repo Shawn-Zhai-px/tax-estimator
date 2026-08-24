@@ -49,6 +49,24 @@ export interface YearTaxData {
    * UI so users aren't misled into thinking these are confirmed.
    */
   caDataIsProvisional?: boolean;
+
+  /** Social Security wage base (OASDI taxable maximum) for this year — used for the Social Security portion of self-employment tax. */
+  ssWageBase: number;
+  /** Child Tax Credit, per qualifying child under 17. */
+  childTaxCredit: number;
+  /** Credit for Other Dependents, per dependent who doesn't qualify for the CTC. */
+  otherDependentCredit: number;
+  /** CTC/ODC phase-out begins above this MAGI for Married Filing Jointly. */
+  ctcPhaseOutThresholdMfj: number;
+  /** CTC/ODC phase-out begins above this MAGI for Single/HoH/MFS. */
+  ctcPhaseOutThresholdOther: number;
+  /** Maximum student loan interest deduction (per return, not per person). */
+  studentLoanInterestMax: number;
+  /** Student loan interest deduction MAGI phase-out range, by filing-status group. MFS is not eligible at all (not modeled here). */
+  studentLoanPhaseOut: {
+    singleHoh: { lower: number; upper: number };
+    mfj: { lower: number; upper: number };
+  };
 }
 
 export const SUPPORTED_TAX_YEARS = [2025, 2026] as const;

@@ -186,6 +186,165 @@ console.log("\n== 2026 config: sanity checks against IRS Rev. Proc. 2025-32 ==")
   }
 }
 
+console.log("\n== Phase A: self-employment tax ==");
+{
+  // Pure self-employment income, no W-2 wages: SS portion uncapped (well
+  // under the 2025 wage base), Medicare portion always uncapped.
+  const result = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  const netEarnings = 100_000 * 0.9235; // 92,350
+  const expectedSeTax = netEarnings * 0.124 + netEarnings * 0.029; // 14,129.55
+  check("SE tax, no W-2 wages", result.selfEmploymentTax, expectedSeTax);
+  check("SE tax deduction is half of SE tax", result.selfEmploymentTaxDeduction, expectedSeTax / 2);
+
+  const expectedAGI = 100_000 - expectedSeTax / 2;
+  check("federal AGI after SE tax deduction", result.federalAGI, expectedAGI);
+
+  const expectedTaxable = expectedAGI - 15750;
+  const expectedFederalTax =
+    11925 * 0.1 + 36550 * 0.12 + (expectedTaxable - 48475) * 0.22;
+  check("federal tax on SE income", result.federalTax, expectedFederalTax);
+  check(
+    "federal total tax includes SE tax",
+    result.federalTotalTax,
+    expectedFederalTax + expectedSeTax
+  );
+}
+
+{
+  // W-2 wages + self-employment income together: the Social Security
+  // portion of SE tax should only apply to the wage-base room left after
+  // the W-2 wages (2025 wage base: $176,100).
+  const result = estimateTax({
+    grossIncome: 170_000,
+    selfEmploymentNetIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  const netEarnings = 50_000 * 0.9235; // 46,175
+  const ssRoom = 176_100 - 170_000; // 6,100
+  const expectedSeTax = Math.min(netEarnings, ssRoom) * 0.124 + netEarnings * 0.029;
+  check("SE tax caps SS portion at remaining wage base", result.selfEmploymentTax, expectedSeTax);
+}
+
+{
+  // 2026 self-employment tax should use the 2026 SS wage base ($184,500).
+  const result = estimateTax({
+    grossIncome: 180_000,
+    selfEmploymentNetIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+  });
+  const netEarnings = 20_000 * 0.9235; // 18,470
+  const ssRoom = 184_500 - 180_000; // 4,500
+  const expectedSeTax = Math.min(netEarnings, ssRoom) * 0.124 + netEarnings * 0.029;
+  check("2026 SE tax uses 2026 SS wage base", result.selfEmploymentTax, expectedSeTax);
+}
+
+console.log("\n== Phase A: Child Tax Credit / Credit for Other Dependents ==");
+{
+  // Well under the phase-out threshold: full credit.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+    otherDependents: 1,
+  });
+  const rawCredit = 2 * 2200 + 1 * 500; // 4,900
+  check("full dependent credit under phase-out threshold", result.dependentCreditAmount, rawCredit);
+
+  const expectedFederalTaxBeforeCredit = 23850 * 0.1 + (68500 - 23850) * 0.12; // taxable 68,500
+  check("federal tax before credit (MFJ)", result.federalTaxBeforeCredits, expectedFederalTaxBeforeCredit);
+  check(
+    "federal tax after dependent credit",
+    result.federalTax,
+    expectedFederalTaxBeforeCredit - rawCredit
+  );
+}
+
+{
+  // $1,000 over the $400,000 MFJ threshold -> $50 reduction (one $1,000 step).
+  const result = estimateTax({
+    grossIncome: 401_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 1,
+  });
+  check("dependent credit partial phase-out", result.dependentCreditAmount, 2200 - 50);
+}
+
+{
+  // Comfortably past the threshold -> credit fully phased out (clamped at 0).
+  const result = estimateTax({
+    grossIncome: 450_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 1,
+  });
+  check("dependent credit fully phased out", result.dependentCreditAmount, 0);
+}
+
+console.log("\n== Phase A: student loan interest deduction ==");
+{
+  // Comfortably under the phase-out range: full deduction, capped at $2,500.
+  const result = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    studentLoanInterestPaid: 3000,
+  });
+  check("student loan deduction capped at $2,500", result.studentLoanInterestDeduction, 2500);
+}
+
+{
+  // Halfway through the 2025 single/HoH phase-out range ($85k-$100k) -> 50%.
+  const result = estimateTax({
+    grossIncome: 92_500,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    studentLoanInterestPaid: 2000,
+  });
+  check("student loan deduction at 50% phase-out", result.studentLoanInterestDeduction, 1000);
+}
+
+{
+  // Married Filing Separately is never eligible, regardless of income.
+  const result = estimateTax({
+    grossIncome: 30_000,
+    filingStatus: "mfs",
+    state: "TX",
+    taxYear: 2025,
+    studentLoanInterestPaid: 1000,
+  });
+  check("student loan deduction is $0 for MFS", result.studentLoanInterestDeduction, 0);
+}
+
+{
+  // 2026 MFJ phase-out range is $175k-$205k (differs from 2025's $170k-$200k).
+  const result = estimateTax({
+    grossIncome: 190_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2026,
+    studentLoanInterestPaid: 2500,
+  });
+  // (205,000 - 190,000) / (205,000 - 175,000) = 0.5
+  check("2026 MFJ student loan phase-out uses 2026 range", result.studentLoanInterestDeduction, 1250);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   process.exit(1);

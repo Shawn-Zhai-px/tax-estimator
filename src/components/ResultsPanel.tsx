@@ -48,7 +48,11 @@ export default function ResultsPanel({
         </div>
       )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Federal tax" value={formatCurrency(result.federalTax)} />
+        <StatTile
+          label="Federal tax"
+          value={formatCurrency(result.federalTotalTax)}
+          sub={result.selfEmploymentTax > 0 ? `incl. ${formatCurrency(result.selfEmploymentTax)} SE tax` : undefined}
+        />
         <StatTile
           label={result.state === "CA" ? "CA state tax" : "State tax"}
           value={formatCurrency(result.stateTax)}
@@ -61,7 +65,7 @@ export default function ResultsPanel({
         <StatTile
           label="Estimated take-home"
           value={formatCurrency(result.estimatedTakeHome)}
-          sub="Before payroll taxes"
+          sub="Excludes FICA/payroll tax on wages"
         />
       </div>
 
@@ -77,9 +81,41 @@ export default function ResultsPanel({
             <dd className="font-medium">{result.state}</dd>
           </div>
           <div className="flex justify-between border-b border-slate-100 py-1.5">
-            <dt className="text-slate-500">Gross income</dt>
+            <dt className="text-slate-500">Wages / gross income</dt>
             <dd className="font-medium">{formatCurrency(result.grossIncome)}</dd>
           </div>
+          {result.selfEmploymentNetIncome > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Self-employment net income</dt>
+              <dd className="font-medium">{formatCurrency(result.selfEmploymentNetIncome)}</dd>
+            </div>
+          )}
+          {result.selfEmploymentTax > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Self-employment tax</dt>
+              <dd className="font-medium">{formatCurrency(result.selfEmploymentTax)}</dd>
+            </div>
+          )}
+          {result.selfEmploymentNetIncome > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Total income</dt>
+              <dd className="font-medium">{formatCurrency(result.totalIncome)}</dd>
+            </div>
+          )}
+          {result.totalAdjustments > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">
+                Adjustments (½ SE tax + student loan interest)
+              </dt>
+              <dd className="font-medium">{formatCurrency(result.totalAdjustments)}</dd>
+            </div>
+          )}
+          {result.totalAdjustments > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Federal AGI</dt>
+              <dd className="font-medium">{formatCurrency(result.federalAGI)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
             <dt className="text-slate-500">
               Federal deduction ({result.deductionType})
@@ -90,6 +126,14 @@ export default function ResultsPanel({
             <dt className="text-slate-500">Federal taxable income</dt>
             <dd className="font-medium">{formatCurrency(result.federalTaxableIncome)}</dd>
           </div>
+          {result.dependentCreditAmount > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">
+                Child Tax Credit / Credit for Other Dependents
+              </dt>
+              <dd className="font-medium">−{formatCurrency(result.dependentCreditAmount)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
             <dt className="text-slate-500">Federal marginal rate</dt>
             <dd className="font-medium">{formatPercent(result.federalMarginalRate)}</dd>

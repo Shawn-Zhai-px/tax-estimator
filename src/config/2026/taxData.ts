@@ -83,4 +83,24 @@ export const TAX_DATA_2026: YearTaxData = {
   caMentalHealthTaxThreshold: TAX_DATA_2025.caMentalHealthTaxThreshold,
   caMentalHealthTaxRate: TAX_DATA_2025.caMentalHealthTaxRate,
   caDataIsProvisional: true,
+  // SSA: 2026 Social Security wage base (taxable maximum) is $184,500 (same
+  // figure independently sourced from the EDD/IRS 2026 payroll tables used
+  // in ../../lib/paycheckData.ts's SS_WAGE_BASE).
+  ssWageBase: 184_500,
+  // IRS Rev. Proc. 2025-32: 2026 Child Tax Credit remains $2,200/child and
+  // Credit for Other Dependents remains $500, same $400,000 (MFJ) /
+  // $200,000 (other) phase-out thresholds as 2025 (OBBBA fixed these,
+  // indexed going forward but unchanged for 2026).
+  childTaxCredit: 2200,
+  otherDependentCredit: 500,
+  ctcPhaseOutThresholdMfj: 400_000,
+  ctcPhaseOutThresholdOther: 200_000,
+  // IRS Rev. Proc. 2025-32: 2026 student loan interest deduction, $2,500
+  // max. Single/HoH phase-out unchanged at $85,000-$100,000; MFJ phase-out
+  // rises to $175,000-$205,000. Not available for Married Filing Separately.
+  studentLoanInterestMax: 2500,
+  studentLoanPhaseOut: {
+    singleHoh: { lower: 85_000, upper: 100_000 },
+    mfj: { lower: 175_000, upper: 205_000 },
+  },
 };

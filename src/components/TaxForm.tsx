@@ -16,6 +16,10 @@ export interface TaxFormValues {
   state: StateCode;
   useItemized: boolean;
   itemizedDeduction: string;
+  selfEmploymentNetIncome: string;
+  qualifyingChildren: string;
+  otherDependents: string;
+  studentLoanInterestPaid: string;
 }
 
 interface TaxFormProps {
@@ -50,7 +54,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div>
         <label htmlFor="grossIncome" className="block text-sm font-medium text-slate-700">
-          Gross annual income (税前年收入, USD)
+          Wages / gross annual income (W-2, 税前年收入, USD)
         </label>
         <div className="relative mt-1">
           <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
@@ -140,6 +144,105 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
           your entry and the standard deduction. California always uses its
           own standard deduction in this MVP.
         </p>
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <p className="text-sm font-medium text-slate-700">
+          Additional income &amp; deductions (optional)
+        </p>
+
+        <div>
+          <label htmlFor="selfEmploymentNetIncome" className="block text-sm font-medium text-slate-700">
+            Self-employment net income
+          </label>
+          <div className="relative mt-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+              $
+            </span>
+            <input
+              id="selfEmploymentNetIncome"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={100}
+              value={values.selfEmploymentNetIncome}
+              onChange={(e) => update("selfEmploymentNetIncome", e.target.value)}
+              placeholder="0"
+              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Net profit from self-employment/1099/gig work (Schedule C), before
+            self-employment tax. We&apos;ll compute self-employment tax and its
+            deductible half automatically.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label htmlFor="qualifyingChildren" className="block text-sm font-medium text-slate-700">
+              Qualifying children (under 17)
+            </label>
+            <input
+              id="qualifyingChildren"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={values.qualifyingChildren}
+              onChange={(e) => update("qualifyingChildren", e.target.value)}
+              placeholder="0"
+              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+          <div>
+            <label htmlFor="otherDependents" className="block text-sm font-medium text-slate-700">
+              Other dependents
+            </label>
+            <input
+              id="otherDependents"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={values.otherDependents}
+              onChange={(e) => update("otherDependents", e.target.value)}
+              placeholder="0"
+              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+        </div>
+        <p className="-mt-2 text-xs text-slate-500">
+          Child Tax Credit ($2,200/child) and Credit for Other Dependents
+          ($500 each), phased out above $200,000 MAGI ($400,000 if married
+          filing jointly). Reduces federal tax only.
+        </p>
+
+        <div>
+          <label htmlFor="studentLoanInterestPaid" className="block text-sm font-medium text-slate-700">
+            Student loan interest paid
+          </label>
+          <div className="relative mt-1">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+              $
+            </span>
+            <input
+              id="studentLoanInterestPaid"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step={10}
+              value={values.studentLoanInterestPaid}
+              onChange={(e) => update("studentLoanInterestPaid", e.target.value)}
+              placeholder="0"
+              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Capped at $2,500 and phased out at higher incomes. Not available
+            if your filing status is Married Filing Separately.
+          </p>
+        </div>
       </div>
     </div>
   );

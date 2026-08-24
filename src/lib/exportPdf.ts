@@ -25,15 +25,32 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   spacer(10);
 
   line("Inputs", 13, true);
-  line(`Gross income: ${formatCurrency(result.grossIncome)}`);
+  line(`Wages / gross income: ${formatCurrency(result.grossIncome)}`);
+  if (result.selfEmploymentNetIncome > 0) {
+    line(`Self-employment net income: ${formatCurrency(result.selfEmploymentNetIncome)}`);
+  }
+  if (result.qualifyingChildren > 0 || result.otherDependents > 0) {
+    line(`Dependents: ${result.qualifyingChildren} qualifying child(ren), ${result.otherDependents} other`);
+  }
   line(`Filing status: ${FILING_STATUS_LABELS[result.filingStatus]}`);
   line(`State: ${result.state}`);
   line(`Federal deduction used (${result.deductionType}): ${formatCurrency(result.deductionUsed)}`);
   spacer(10);
 
   line("Results", 13, true);
+  if (result.selfEmploymentNetIncome > 0) {
+    line(`Total income: ${formatCurrency(result.totalIncome)}`);
+    line(`Federal AGI (after adjustments): ${formatCurrency(result.federalAGI)}`);
+  }
   line(`Federal taxable income: ${formatCurrency(result.federalTaxableIncome)}`);
-  line(`Federal tax: ${formatCurrency(result.federalTax)}  (marginal rate ${formatPercent(result.federalMarginalRate)})`);
+  if (result.dependentCreditAmount > 0) {
+    line(`  less Child Tax Credit / Credit for Other Dependents: ${formatCurrency(result.dependentCreditAmount)}`);
+  }
+  line(`Federal income tax: ${formatCurrency(result.federalTax)}  (marginal rate ${formatPercent(result.federalMarginalRate)})`);
+  if (result.selfEmploymentTax > 0) {
+    line(`  plus self-employment tax: ${formatCurrency(result.selfEmploymentTax)}`);
+    line(`Federal total tax: ${formatCurrency(result.federalTotalTax)}`, 11, true);
+  }
   line(`State taxable income: ${formatCurrency(result.stateTaxableIncome)}`);
   line(`State tax: ${formatCurrency(result.stateTax)}  (marginal rate ${formatPercent(result.stateMarginalRate)})`);
   if (result.caMentalHealthTax > 0) {
@@ -41,7 +58,7 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   }
   line(`Total estimated tax: ${formatCurrency(result.totalTax)}`, 12, true);
   line(`Overall effective rate: ${formatPercent(result.totalEffectiveRate)}`);
-  line(`Estimated take-home (before payroll taxes): ${formatCurrency(result.estimatedTakeHome)}`, 12, true);
+  line(`Estimated take-home (excl. FICA on wages): ${formatCurrency(result.estimatedTakeHome)}`, 12, true);
   spacer(14);
 
   line("Federal bracket breakdown", 13, true);
@@ -68,15 +85,28 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   spacer(14);
   line("Federal Form 1040 line reference", 13, true);
   line(`1a  Wages (from Form W-2, box 1): ${formatCurrency(result.grossIncome)}`, 9.5);
-  line(`9   Total income: ${formatCurrency(result.grossIncome)}`, 9.5);
-  line(`11  Adjusted gross income (AGI): ${formatCurrency(result.grossIncome)}`, 9.5);
+  if (result.selfEmploymentNetIncome > 0) {
+    line(`8   Additional income (Schedule 1: self-employment profit): ${formatCurrency(result.selfEmploymentNetIncome)}`, 9.5);
+  }
+  line(`9   Total income: ${formatCurrency(result.totalIncome)}`, 9.5);
+  if (result.totalAdjustments > 0) {
+    line(`10  Adjustments to income (½ SE tax + student loan interest): ${formatCurrency(result.totalAdjustments)}`, 9.5);
+  }
+  line(`11  Adjusted gross income (AGI): ${formatCurrency(result.federalAGI)}`, 9.5);
   line(
     `12  ${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction: ${formatCurrency(result.deductionUsed)}`,
     9.5
   );
   line(`15  Taxable income: ${formatCurrency(result.federalTaxableIncome)}`, 9.5);
-  line(`16  Tax: ${formatCurrency(result.federalTax)}`, 9.5);
-  line(`24  Total tax: ${formatCurrency(result.federalTax)}`, 9.5);
+  line(`16  Tax: ${formatCurrency(result.federalTaxBeforeCredits)}`, 9.5);
+  if (result.dependentCreditAmount > 0) {
+    line(`19  Child tax credit / credit for other dependents: ${formatCurrency(result.dependentCreditAmount)}`, 9.5);
+  }
+  line(`22  Subtotal after credits: ${formatCurrency(result.federalTax)}`, 9.5);
+  if (result.selfEmploymentTax > 0) {
+    line(`23  Other taxes (Schedule 2: self-employment tax): ${formatCurrency(result.selfEmploymentTax)}`, 9.5);
+  }
+  line(`24  Total tax: ${formatCurrency(result.federalTotalTax)}`, 9.5);
 
   if (result.state === "CA") {
     const taxBeforeCredits = result.stateTax - result.caMentalHealthTax;
@@ -87,7 +117,7 @@ export function exportResultToPdf(result: TaxEstimateResult) {
       true
     );
     line(`12  State wages (from Form W-2, box 16): ${formatCurrency(result.grossIncome)}`, 9.5);
-    line(`13  Federal adjusted gross income (AGI): ${formatCurrency(result.grossIncome)}`, 9.5);
+    line(`13  Federal adjusted gross income (AGI): ${formatCurrency(result.federalAGI)}`, 9.5);
     line(`18  CA standard deduction: ${formatCurrency(result.caDeductionUsed)}`, 9.5);
     line(`19  CA taxable income: ${formatCurrency(result.stateTaxableIncome)}`, 9.5);
     line(`31  Tax (before credits): ${formatCurrency(taxBeforeCredits)}`, 9.5);

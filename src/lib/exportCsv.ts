@@ -21,15 +21,31 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push("");
 
   rows.push(toRow(["Section", "Field", "Value"]));
-  rows.push(toRow(["Input", "Gross income", result.grossIncome]));
+  rows.push(toRow(["Input", "Wages / gross income", result.grossIncome]));
+  rows.push(toRow(["Input", "Self-employment net income", result.selfEmploymentNetIncome]));
+  rows.push(toRow(["Input", "Qualifying children", result.qualifyingChildren]));
+  rows.push(toRow(["Input", "Other dependents", result.otherDependents]));
   rows.push(toRow(["Input", "Filing status", FILING_STATUS_LABELS[result.filingStatus]]));
   rows.push(toRow(["Input", "State", result.state]));
   rows.push(toRow(["Input", "Federal deduction type", result.deductionType]));
   rows.push(toRow(["Input", "Federal deduction used", result.deductionUsed]));
   rows.push("");
 
+  rows.push(toRow(["Result", "Total income", result.totalIncome.toFixed(2)]));
+  if (result.totalAdjustments > 0) {
+    rows.push(toRow(["Result", "Adjustments to income", result.totalAdjustments.toFixed(2)]));
+  }
+  rows.push(toRow(["Result", "Federal AGI", result.federalAGI.toFixed(2)]));
   rows.push(toRow(["Result", "Federal taxable income", result.federalTaxableIncome]));
-  rows.push(toRow(["Result", "Federal tax", result.federalTax.toFixed(2)]));
+  rows.push(toRow(["Result", "Federal tax (before credits)", result.federalTaxBeforeCredits.toFixed(2)]));
+  if (result.dependentCreditAmount > 0) {
+    rows.push(toRow(["Result", "Child Tax Credit / Credit for Other Dependents", result.dependentCreditAmount.toFixed(2)]));
+  }
+  rows.push(toRow(["Result", "Federal income tax (after credits)", result.federalTax.toFixed(2)]));
+  if (result.selfEmploymentTax > 0) {
+    rows.push(toRow(["Result", "Self-employment tax", result.selfEmploymentTax.toFixed(2)]));
+  }
+  rows.push(toRow(["Result", "Federal total tax", result.federalTotalTax.toFixed(2)]));
   rows.push(toRow(["Result", "Federal marginal rate", result.federalMarginalRate]));
   rows.push(toRow(["Result", "Federal effective rate", result.federalEffectiveRate]));
   rows.push(toRow(["Result", "State taxable income", result.stateTaxableIncome]));
@@ -41,7 +57,7 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   }
   rows.push(toRow(["Result", "Total estimated tax", result.totalTax.toFixed(2)]));
   rows.push(toRow(["Result", "Total effective rate", result.totalEffectiveRate]));
-  rows.push(toRow(["Result", "Estimated take-home (pre-payroll-tax)", result.estimatedTakeHome.toFixed(2)]));
+  rows.push(toRow(["Result", "Estimated take-home (excl. FICA on wages)", result.estimatedTakeHome.toFixed(2)]));
   rows.push("");
 
   rows.push(toRow(["Federal bracket breakdown"]));
@@ -79,8 +95,14 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push(toRow([`Federal Form 1040 line reference (${result.taxYear})`]));
   rows.push(toRow(["Line", "Label", "Amount"]));
   rows.push(toRow(["1a", "Wages (from Form W-2, box 1)", result.grossIncome]));
-  rows.push(toRow(["9", "Total income", result.grossIncome]));
-  rows.push(toRow(["11", "Adjusted gross income (AGI)", result.grossIncome]));
+  if (result.selfEmploymentNetIncome > 0) {
+    rows.push(toRow(["8", "Additional income (Schedule 1: self-employment profit)", result.selfEmploymentNetIncome]));
+  }
+  rows.push(toRow(["9", "Total income", result.totalIncome.toFixed(2)]));
+  if (result.totalAdjustments > 0) {
+    rows.push(toRow(["10", "Adjustments to income (½ SE tax + student loan interest)", result.totalAdjustments.toFixed(2)]));
+  }
+  rows.push(toRow(["11", "Adjusted gross income (AGI)", result.federalAGI.toFixed(2)]));
   rows.push(
     toRow([
       "12",
@@ -89,8 +111,15 @@ export function exportResultToCsv(result: TaxEstimateResult) {
     ])
   );
   rows.push(toRow(["15", "Taxable income", result.federalTaxableIncome.toFixed(2)]));
-  rows.push(toRow(["16", "Tax", result.federalTax.toFixed(2)]));
-  rows.push(toRow(["24", "Total tax", result.federalTax.toFixed(2)]));
+  rows.push(toRow(["16", "Tax", result.federalTaxBeforeCredits.toFixed(2)]));
+  if (result.dependentCreditAmount > 0) {
+    rows.push(toRow(["19", "Child tax credit / credit for other dependents", result.dependentCreditAmount.toFixed(2)]));
+  }
+  rows.push(toRow(["22", "Subtotal after credits", result.federalTax.toFixed(2)]));
+  if (result.selfEmploymentTax > 0) {
+    rows.push(toRow(["23", "Other taxes (Schedule 2: self-employment tax)", result.selfEmploymentTax.toFixed(2)]));
+  }
+  rows.push(toRow(["24", "Total tax", result.federalTotalTax.toFixed(2)]));
 
   if (result.state === "CA") {
     const taxBeforeCredits = result.stateTax - result.caMentalHealthTax;
@@ -104,7 +133,7 @@ export function exportResultToCsv(result: TaxEstimateResult) {
     );
     rows.push(toRow(["Line", "Label", "Amount"]));
     rows.push(toRow(["12", "State wages (from Form W-2, box 16)", result.grossIncome]));
-    rows.push(toRow(["13", "Federal adjusted gross income (AGI)", result.grossIncome]));
+    rows.push(toRow(["13", "Federal adjusted gross income (AGI)", result.federalAGI.toFixed(2)]));
     rows.push(toRow(["18", "CA standard deduction", result.caDeductionUsed]));
     rows.push(toRow(["19", "CA taxable income", result.stateTaxableIncome.toFixed(2)]));
     rows.push(toRow(["31", "Tax (before credits)", taxBeforeCredits.toFixed(2)]));

@@ -15,7 +15,7 @@ export default function Form540Summary({ result }: { result: TaxEstimateResult }
 
   const rows: { line: string; label: string; value: number }[] = [
     { line: "12", label: "State wages (from Form W-2, box 16)", value: result.grossIncome },
-    { line: "13", label: "Federal adjusted gross income (AGI)", value: result.grossIncome },
+    { line: "13", label: "Federal adjusted gross income (AGI)", value: result.federalAGI },
     { line: "18", label: "CA standard deduction", value: result.caDeductionUsed },
     { line: "19", label: "CA taxable income", value: result.stateTaxableIncome },
     { line: "31", label: "Tax (before credits)", value: taxBeforeCredits },

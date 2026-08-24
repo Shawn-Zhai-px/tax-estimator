@@ -13,17 +13,56 @@ import { formatCurrency } from "@/lib/format";
 export default function Form1040Summary({ result }: { result: TaxEstimateResult }) {
   const rows: { line: string; label: string; value: number }[] = [
     { line: "1a", label: "Wages (from Form W-2, box 1)", value: result.grossIncome },
-    { line: "9", label: "Total income", value: result.grossIncome },
-    { line: "11", label: "Adjusted gross income (AGI)", value: result.grossIncome },
+  ];
+
+  if (result.selfEmploymentNetIncome > 0) {
+    rows.push({
+      line: "8",
+      label: "Additional income (Schedule 1: self-employment profit)",
+      value: result.selfEmploymentNetIncome,
+    });
+  }
+
+  rows.push({ line: "9", label: "Total income", value: result.totalIncome });
+
+  if (result.totalAdjustments > 0) {
+    rows.push({
+      line: "10",
+      label: "Adjustments to income (½ SE tax + student loan interest)",
+      value: result.totalAdjustments,
+    });
+  }
+
+  rows.push(
+    { line: "11", label: "Adjusted gross income (AGI)", value: result.federalAGI },
     {
       line: "12",
       label: `${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction`,
       value: result.deductionUsed,
     },
     { line: "15", label: "Taxable income", value: result.federalTaxableIncome },
-    { line: "16", label: "Tax", value: result.federalTax },
-    { line: "24", label: "Total tax", value: result.federalTax },
-  ];
+    { line: "16", label: "Tax", value: result.federalTaxBeforeCredits }
+  );
+
+  if (result.dependentCreditAmount > 0) {
+    rows.push({
+      line: "19",
+      label: "Child tax credit / credit for other dependents",
+      value: result.dependentCreditAmount,
+    });
+  }
+
+  rows.push({ line: "22", label: "Subtotal after credits", value: result.federalTax });
+
+  if (result.selfEmploymentTax > 0) {
+    rows.push({
+      line: "23",
+      label: "Other taxes (Schedule 2: self-employment tax)",
+      value: result.selfEmploymentTax,
+    });
+  }
+
+  rows.push({ line: "24", label: "Total tax", value: result.federalTotalTax });
 
   return (
     <div className="mt-3">
@@ -48,9 +87,9 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        Reference only — assumes no other income, adjustments, credits, or
-        withholding (Schedule 1/2/3 and lines 10, 13, 17–23, 25–37 aren't
-        modeled). See the disclaimer above.
+        Reference only — assumes no other income, no itemized-deduction
+        breakdown, no other credits (EITC, education, etc.), no AMT/NIIT, and
+        no withholding/estimated payments. See the disclaimer above.
       </p>
     </div>
   );
