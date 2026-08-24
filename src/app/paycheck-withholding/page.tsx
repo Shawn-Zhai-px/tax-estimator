@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import DisclaimerBanner from "@/components/DisclaimerBanner";
-import PaycheckForm, { PaycheckFormValues } from "@/components/PaycheckForm";
+import PaycheckForm, { PaycheckFormValues, TOTAL_STEPS } from "@/components/PaycheckForm";
 import AnnualScheduleTable from "@/components/AnnualScheduleTable";
-import { computeAnnualSchedule, PaycheckInput } from "@/lib/calculatePaycheck";
+import { computeAnnualSchedule, computeBonusAfterPaycheckNum, PaycheckInput } from "@/lib/calculatePaycheck";
 import { exportScheduleToCsv } from "@/lib/exportPaycheckCsv";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -14,38 +14,34 @@ import {
   DEP_CARE_FSA_ANNUAL_LIMIT,
   FOUR_ZERO_ONE_K_ANNUAL_LIMIT,
   PAYCHECK_TAX_YEAR,
+  PAY_PERIODS_PER_YEAR,
   SS_RATE,
   SS_WAGE_BASE,
+  mapFederalToCaFilingStatus,
 } from "@/lib/paycheckData";
 
 const DEFAULT_VALUES: PaycheckFormValues = {
   annualBase: "350000",
   federalFilingStatus: "single",
   payFrequency: "semimonthly",
-  annualHealthPremium: "8500",
 
   multipleJobsCheckbox: false,
   step3Credits: "0",
   step4aOtherIncome: "0",
   step4bDeductions: "0",
-  step4cExtraWithholding: "0",
 
   fourZeroOneKRate: "0.10",
-  depCareFsaRate: "0.02",
   catchUpEligibility: "standard",
   rothCatchUpRate: "0.03",
+  depCareFsaRate: "0.02",
+  annualHealthPremium: "8500",
 
-  applyCA: true,
-  caFilingStatus: "single",
-  caRegularAllowances: "0",
-  caEstDedAllowances: "0",
-  caMarried2PlusAllowances: false,
+  bonusAmount: "0",
+  firstPaycheckDate: `${PAYCHECK_TAX_YEAR}-01-01`,
+  bonusDate: `${PAYCHECK_TAX_YEAR}-01-01`,
+
+  step4cExtraWithholding: "0",
   caAdditionalWithholding: "0",
-
-  includeBonus: true,
-  bonusAmount: "50000",
-  bonusAfterPaycheckNum: "4",
-  ytdSupplementalWages: "0",
 };
 
 function num(v: string): number {
@@ -64,9 +60,17 @@ function StatTile({ label, value, sub }: { label: string; value: string; sub?: s
 
 export default function PaycheckWithholdingPage() {
   const [values, setValues] = useState<PaycheckFormValues>(DEFAULT_VALUES);
+  const [step, setStep] = useState(1);
+  const [showResults, setShowResults] = useState(false);
 
-  const input: PaycheckInput = useMemo(
-    () => ({
+  const input: PaycheckInput = useMemo(() => {
+    const includeBonus = num(values.bonusAmount) > 0;
+    const periodsPerYear = PAY_PERIODS_PER_YEAR[values.payFrequency];
+    const bonusAfterPaycheckNum = includeBonus
+      ? computeBonusAfterPaycheckNum(values.firstPaycheckDate, values.bonusDate, periodsPerYear)
+      : 0;
+
+    return {
       annualBase: num(values.annualBase),
       federalFilingStatus: values.federalFilingStatus,
       payFrequency: values.payFrequency,
@@ -84,22 +88,33 @@ export default function PaycheckWithholdingPage() {
       catchUpEligibility: values.catchUpEligibility,
       rothCatchUpRate: num(values.rothCatchUpRate),
 
-      applyCA: values.applyCA,
-      caFilingStatus: values.caFilingStatus,
-      caRegularAllowances: num(values.caRegularAllowances),
-      caEstDedAllowances: num(values.caEstDedAllowances),
-      caMarried2PlusAllowances: values.caMarried2PlusAllowances,
+      applyCA: true,
+      caFilingStatus: mapFederalToCaFilingStatus(values.federalFilingStatus),
+      caRegularAllowances: 0,
+      caEstDedAllowances: 0,
+      caMarried2PlusAllowances: false,
       caAdditionalWithholding: num(values.caAdditionalWithholding),
 
-      includeBonus: values.includeBonus,
+      includeBonus,
       bonusAmount: num(values.bonusAmount),
-      bonusAfterPaycheckNum: num(values.bonusAfterPaycheckNum),
-      ytdSupplementalWages: num(values.ytdSupplementalWages),
-    }),
-    [values]
-  );
+      bonusAfterPaycheckNum,
+      ytdSupplementalWages: 0,
+    };
+  }, [values]);
 
   const result = useMemo(() => computeAnnualSchedule(input), [input]);
+
+  function handleAdvance() {
+    if (step < TOTAL_STEPS) {
+      setStep(step + 1);
+    } else {
+      setShowResults(true);
+    }
+  }
+
+  function handleBack() {
+    setStep(Math.max(1, step - 1));
+  }
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
@@ -121,31 +136,51 @@ export default function PaycheckWithholdingPage() {
         <DisclaimerBanner />
       </div>
 
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile label="Total withholding" value={formatCurrency(result.totals.totalWithholding)} />
-        <StatTile label="Federal tax" value={formatCurrency(result.totals.fedIncTaxWithheld)} />
-        <StatTile label="CA state tax" value={formatCurrency(result.totals.caStateIncTaxWithheld)} />
-        <StatTile label="Net pay" value={formatCurrency(result.totals.netPay)} sub={`${result.rows.length} pay events`} />
-      </div>
-
-      <div className="mb-6">
-        <PaycheckForm values={values} onChange={setValues} />
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-slate-900">
-            Annual Schedule ({result.periodsPerYear} pay periods/year)
-          </h3>
-          <button
-            onClick={() => exportScheduleToCsv(result, values.payFrequency)}
-            className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            Export CSV
-          </button>
+      {!showResults ? (
+        <div className="mx-auto max-w-xl">
+          <PaycheckForm
+            values={values}
+            onChange={setValues}
+            step={step}
+            onBack={handleBack}
+            onAdvance={handleAdvance}
+          />
         </div>
-        <AnnualScheduleTable result={result} />
-      </div>
+      ) : (
+        <div>
+          <button
+            onClick={() => {
+              setShowResults(false);
+              setStep(TOTAL_STEPS);
+            }}
+            className="mb-4 text-sm text-brand-600 hover:underline"
+          >
+            ← Edit inputs
+          </button>
+
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatTile label="Total withholding" value={formatCurrency(result.totals.totalWithholding)} />
+            <StatTile label="Federal tax" value={formatCurrency(result.totals.fedIncTaxWithheld)} />
+            <StatTile label="CA state tax" value={formatCurrency(result.totals.caStateIncTaxWithheld)} />
+            <StatTile label="Net pay" value={formatCurrency(result.totals.netPay)} sub={`${result.rows.length} pay events`} />
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold text-slate-900">
+                Annual Schedule ({result.periodsPerYear} pay periods/year)
+              </h3>
+              <button
+                onClick={() => exportScheduleToCsv(result, values.payFrequency)}
+                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Export CSV
+              </button>
+            </div>
+            <AnnualScheduleTable result={result} />
+          </div>
+        </div>
+      )}
 
       <footer className="mt-10 border-t border-slate-200 pt-4 text-xs text-slate-400">
         {PAYCHECK_TAX_YEAR} IRS Pub. 15-T Percentage Method withholding brackets and EDD California

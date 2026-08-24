@@ -209,6 +209,15 @@ export function getCaStandardDeduction(
   return 11412; // hoh
 }
 
+/**
+ * The simplified paycheck form reuses the federal Step 1(c) filing status
+ * for CA (DE 4) purposes instead of asking for it separately.
+ */
+export function mapFederalToCaFilingStatus(status: FederalFilingStatus): CAFilingStatus {
+  if (status === "mfj") return "married";
+  return status; // "single" | "hoh" map directly
+}
+
 /** CA Method B Table 4 (annual), per allowance on DE 4. */
 export const CA_EXEMPTION_CREDIT_PER_ALLOWANCE = 168.3;
 /** CA Method B Table 2 (annual column), per additional DE 4 line-2 allowance. */

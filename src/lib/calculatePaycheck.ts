@@ -111,6 +111,36 @@ function clampToZero(n: number): number {
   return n < 0 ? 0 : n;
 }
 
+/**
+ * Most people don't remember which paycheck number a bonus landed on — but
+ * they do remember roughly when it was paid. Given the date of the year's
+ * first regular paycheck and the bonus date, estimate how many regular
+ * paychecks (assuming level, evenly-spaced pay periods — the same
+ * simplifying assumption `computeAnnualSchedule` already makes) happened
+ * before the bonus.
+ */
+export function computeBonusAfterPaycheckNum(
+  firstPaycheckDate: string,
+  bonusDate: string,
+  periodsPerYear: number
+): number {
+  const first = new Date(`${firstPaycheckDate}T00:00:00`);
+  const bonus = new Date(`${bonusDate}T00:00:00`);
+  if (Number.isNaN(first.getTime()) || Number.isNaN(bonus.getTime())) {
+    return 0;
+  }
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diffDays = (bonus.getTime() - first.getTime()) / msPerDay;
+  if (diffDays < 0) {
+    return 0;
+  }
+
+  const periodLengthDays = 365 / periodsPerYear;
+  const count = Math.floor(diffDays / periodLengthDays) + 1;
+  return Math.min(count, periodsPerYear);
+}
+
 export function computeAnnualSchedule(input: PaycheckInput): AnnualScheduleResult {
   const periodsPerYear = PAY_PERIODS_PER_YEAR[input.payFrequency];
   const rothAnnualLimit = ROTH_CATCHUP_ANNUAL_LIMIT[input.catchUpEligibility];
