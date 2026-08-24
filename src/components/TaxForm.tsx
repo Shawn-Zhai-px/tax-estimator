@@ -1,8 +1,16 @@
 "use client";
 
-import { FILING_STATUS_LABELS, FilingStatus, STATES, StateCode } from "@/lib/taxData";
+import {
+  FILING_STATUS_LABELS,
+  FilingStatus,
+  STATES,
+  StateCode,
+  SUPPORTED_TAX_YEARS,
+  TaxYear,
+} from "@/config";
 
 export interface TaxFormValues {
+  taxYear: TaxYear;
   grossIncome: string;
   filingStatus: FilingStatus;
   state: StateCode;
@@ -22,6 +30,24 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
   return (
     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div>
+        <label htmlFor="taxYear" className="block text-sm font-medium text-slate-700">
+          Tax year (税年)
+        </label>
+        <select
+          id="taxYear"
+          value={values.taxYear}
+          onChange={(e) => update("taxYear", Number(e.target.value) as TaxYear)}
+          className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        >
+          {SUPPORTED_TAX_YEARS.map((year) => (
+            <option key={year} value={year}>
+              {year}
+            </option>
+          ))}
+        </select>
+      </div>
+
       <div>
         <label htmlFor="grossIncome" className="block text-sm font-medium text-slate-700">
           Gross annual income (税前年收入, USD)

@@ -1,21 +1,17 @@
 import {
-  CA_BRACKETS,
-  CA_MENTAL_HEALTH_TAX_RATE,
-  CA_MENTAL_HEALTH_TAX_THRESHOLD,
-  CA_STANDARD_DEDUCTION,
-  FEDERAL_BRACKETS,
-  FEDERAL_STANDARD_DEDUCTION,
   FilingStatus,
   StateCode,
-  TAX_YEAR,
   TaxBracket,
-} from "./taxData";
+  TaxYear,
+  getTaxDataForYear,
+} from "@/config";
 
 export interface TaxEstimateInput {
   /** Gross annual income before deductions. */
   grossIncome: number;
   filingStatus: FilingStatus;
   state: StateCode;
+  taxYear: TaxYear;
   /**
    * Optional: use an itemized deduction amount instead of the standard
    * deduction, if it's larger. MVP only supports a single flat number
@@ -49,6 +45,10 @@ export interface TaxEstimateResult {
   stateMarginalRate: number;
   stateEffectiveRate: number;
   stateBracketBreakdown: BracketBreakdownRow[];
+  /** CA standard deduction actually used (0 for non-CA states). */
+  caDeductionUsed: number;
+  /** True if this tax year's CA figures are a carried-forward placeholder (FTB hasn't published them yet). */
+  caDataIsProvisional: boolean;
   caMentalHealthTax: number;
   totalTax: number;
   totalEffectiveRate: number;
@@ -113,8 +113,9 @@ export function applyBrackets(
 export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
   const { grossIncome, filingStatus, state } = input;
   const safeIncome = clampToZero(grossIncome);
+  const yearData = getTaxDataForYear(input.taxYear);
 
-  const standardDeduction = FEDERAL_STANDARD_DEDUCTION[filingStatus];
+  const standardDeduction = yearData.federalStandardDeduction[filingStatus];
   const deductionUsed =
     input.itemizedDeduction && input.itemizedDeduction > standardDeduction
       ? input.itemizedDeduction
@@ -124,7 +125,7 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
 
   // --- Federal ---
   const federalTaxableIncome = clampToZero(safeIncome - deductionUsed);
-  const federalBrackets = FEDERAL_BRACKETS[filingStatus];
+  const federalBrackets = yearData.federalBrackets[filingStatus];
   const federalResult = applyBrackets(federalTaxableIncome, federalBrackets);
 
   // --- State ---
@@ -132,24 +133,25 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
   let stateTax = 0;
   let stateMarginalRate = 0;
   let stateBracketBreakdown: BracketBreakdownRow[] = [];
+  let caDeductionUsed = 0;
   let caMentalHealthTax = 0;
 
   if (state === "CA") {
-    const caDeduction = CA_STANDARD_DEDUCTION[filingStatus];
+    caDeductionUsed = yearData.caStandardDeduction[filingStatus];
     // CA deduction is not swapped for the federal itemized amount in this
     // MVP (CA itemization rules differ from federal); we always use CA's
     // own standard deduction.
-    stateTaxableIncome = clampToZero(safeIncome - caDeduction);
-    const caResult = applyBrackets(stateTaxableIncome, CA_BRACKETS[filingStatus]);
+    stateTaxableIncome = clampToZero(safeIncome - caDeductionUsed);
+    const caResult = applyBrackets(stateTaxableIncome, yearData.caBrackets[filingStatus]);
     stateTax = caResult.tax;
     stateMarginalRate = caResult.marginalRate;
     stateBracketBreakdown = caResult.breakdown;
 
-    if (stateTaxableIncome > CA_MENTAL_HEALTH_TAX_THRESHOLD) {
+    if (stateTaxableIncome > yearData.caMentalHealthTaxThreshold) {
       caMentalHealthTax =
-        (stateTaxableIncome - CA_MENTAL_HEALTH_TAX_THRESHOLD) *
-        CA_MENTAL_HEALTH_TAX_RATE;
-      stateMarginalRate += CA_MENTAL_HEALTH_TAX_RATE;
+        (stateTaxableIncome - yearData.caMentalHealthTaxThreshold) *
+        yearData.caMentalHealthTaxRate;
+      stateMarginalRate += yearData.caMentalHealthTaxRate;
     }
   } else if (state === "TX") {
     stateTaxableIncome = 0;
@@ -162,7 +164,7 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
   const totalTax = federalResult.tax + totalStateTax;
 
   return {
-    taxYear: TAX_YEAR,
+    taxYear: yearData.taxYear,
     grossIncome: safeIncome,
     filingStatus,
     state,
@@ -178,6 +180,8 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     stateMarginalRate,
     stateEffectiveRate: safeIncome > 0 ? totalStateTax / safeIncome : 0,
     stateBracketBreakdown,
+    caDeductionUsed,
+    caDataIsProvisional: state === "CA" ? Boolean(yearData.caDataIsProvisional) : false,
     caMentalHealthTax,
     totalTax,
     totalEffectiveRate: safeIncome > 0 ? totalTax / safeIncome : 0,

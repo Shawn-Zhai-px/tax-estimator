@@ -1,11 +1,5 @@
 /**
- * Tax bracket & deduction reference data.
- *
- * IMPORTANT: This data is for the 2025 tax year (return filed in 2026) and is
- * kept for REFERENCE / ESTIMATION purposes only. It is not tax advice and is
- * not guaranteed to be complete, current, or applicable to any individual's
- * situation. Always confirm numbers against the IRS / your state's tax
- * authority, or consult a licensed tax professional, before relying on them.
+ * Tax year 2025 (return filed in 2026) reference data.
  *
  * Sources (retrieved August 2026):
  * - Federal brackets & standard deduction: IRS Rev. Proc. 2024-40, as
@@ -13,43 +7,18 @@
  *   deduction increase. See https://www.irs.gov and https://taxfoundation.org/data/all/federal/2025-tax-brackets/
  * - California brackets & standard deduction: CA FTB 2025 Form 540 tax rate
  *   schedules, https://www.ftb.ca.gov/forms/2025/2025-540-tax-rate-schedules.pdf
- * - Texas: no state personal income tax.
  */
 
-export type FilingStatus = "single" | "mfj" | "hoh" | "mfs";
+import { TaxBracket, YearTaxData } from "../types";
 
-export type StateCode = "CA" | "TX";
-
-export interface TaxBracket {
-  /** Lower bound of this bracket (inclusive), in dollars of taxable income. */
-  min: number;
-  /** Upper bound of this bracket (exclusive). `null` means "and above". */
-  max: number | null;
-  /** Marginal rate applied to the slice of income within this bracket. */
-  rate: number;
-}
-
-export const TAX_YEAR = 2025;
-
-export const FILING_STATUS_LABELS: Record<FilingStatus, string> = {
-  single: "Single",
-  mfj: "Married Filing Jointly",
-  hoh: "Head of Household",
-  mfs: "Married Filing Separately",
-};
-
-// ---------------------------------------------------------------------------
-// Federal (IRS) — Tax Year 2025
-// ---------------------------------------------------------------------------
-
-export const FEDERAL_STANDARD_DEDUCTION: Record<FilingStatus, number> = {
+const FEDERAL_STANDARD_DEDUCTION = {
   single: 15750,
   mfj: 31500,
   hoh: 23625,
   mfs: 15750,
 };
 
-export const FEDERAL_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
+const FEDERAL_BRACKETS = {
   single: [
     { min: 0, max: 11925, rate: 0.1 },
     { min: 11925, max: 48475, rate: 0.12 },
@@ -87,13 +56,9 @@ export const FEDERAL_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
     { min: 250525, max: 375800, rate: 0.35 },
     { min: 375800, max: null, rate: 0.37 },
   ],
-};
+} satisfies Record<string, TaxBracket[]>;
 
-// ---------------------------------------------------------------------------
-// California (FTB) — Tax Year 2025
-// ---------------------------------------------------------------------------
-
-export const CA_STANDARD_DEDUCTION: Record<FilingStatus, number> = {
+const CA_STANDARD_DEDUCTION = {
   single: 5706,
   mfj: 11412,
   hoh: 11412,
@@ -139,30 +104,17 @@ const CA_SCHEDULE_Z: TaxBracket[] = [
   { min: 1010417, max: null, rate: 0.123 },
 ];
 
-export const CA_BRACKETS: Record<FilingStatus, TaxBracket[]> = {
-  single: CA_SCHEDULE_X,
-  mfs: CA_SCHEDULE_X,
-  mfj: CA_SCHEDULE_Y,
-  hoh: CA_SCHEDULE_Z,
+export const TAX_DATA_2025: YearTaxData = {
+  taxYear: 2025,
+  federalStandardDeduction: FEDERAL_STANDARD_DEDUCTION,
+  federalBrackets: FEDERAL_BRACKETS,
+  caStandardDeduction: CA_STANDARD_DEDUCTION,
+  caBrackets: {
+    single: CA_SCHEDULE_X,
+    mfs: CA_SCHEDULE_X,
+    mfj: CA_SCHEDULE_Y,
+    hoh: CA_SCHEDULE_Z,
+  },
+  caMentalHealthTaxThreshold: 1_000_000,
+  caMentalHealthTaxRate: 0.01,
 };
-
-/** CA Mental Health Services Tax: additional 1% on taxable income over $1,000,000. */
-export const CA_MENTAL_HEALTH_TAX_THRESHOLD = 1_000_000;
-export const CA_MENTAL_HEALTH_TAX_RATE = 0.01;
-
-/**
- * NOTE on scope (documented so the "assumptions" shown in the app are honest):
- * - CA personal/dependent exemption CREDITS (a small credit, roughly $150–$300
- *   depending on filing status, subtracted from tax owed rather than from
- *   income) are NOT applied in this MVP. Omitting them makes the CA estimate
- *   slightly conservative (i.e., a slight overestimate of CA tax owed).
- * - Neither calculation includes payroll taxes (Social Security/Medicare),
- *   the CA SDI payroll tax, the Additional Medicare Tax, self-employment
- *   tax, the Net Investment Income Tax, AMT, or any credits (Child Tax
- *   Credit, EITC, etc.) beyond the standard deduction.
- */
-
-export const STATES: { code: StateCode; label: string }[] = [
-  { code: "CA", label: "California" },
-  { code: "TX", label: "Texas (no state income tax)" },
-];

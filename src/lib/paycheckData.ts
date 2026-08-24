@@ -18,7 +18,7 @@
  *   FSA limit: SSA / IRS 2026 figures.
  */
 
-import { TaxBracket } from "./taxData";
+import { TaxBracket } from "@/config";
 
 export const PAYCHECK_TAX_YEAR = 2026;
 

@@ -4,7 +4,12 @@
  * Run with: npm test   (== tsx src/lib/__tests__/calculateTax.test.ts)
  */
 import { applyBrackets, estimateTax } from "../calculateTax";
-import { FEDERAL_BRACKETS, CA_BRACKETS } from "../taxData";
+import { getTaxDataForYear } from "../../config";
+
+const DATA_2025 = getTaxDataForYear(2025);
+const DATA_2026 = getTaxDataForYear(2026);
+const FEDERAL_BRACKETS = DATA_2025.federalBrackets;
+const CA_BRACKETS = DATA_2025.caBrackets;
 
 let passed = 0;
 let failed = 0;
@@ -60,6 +65,7 @@ console.log("\n== estimateTax: federal + CA end-to-end checks ==");
     grossIncome: 75000,
     filingStatus: "single",
     state: "CA",
+    taxYear: 2025,
   });
   const expectedFederalTaxable = 75000 - 15750; // 59250
   check("federal taxable income", result.federalTaxableIncome, expectedFederalTaxable);
@@ -99,6 +105,7 @@ console.log("\n== estimateTax: federal + CA end-to-end checks ==");
     grossIncome: 500000,
     filingStatus: "mfj",
     state: "TX",
+    taxYear: 2025,
   });
   check("TX state tax is always zero", result.stateTax, 0);
 }
@@ -109,6 +116,7 @@ console.log("\n== estimateTax: federal + CA end-to-end checks ==");
     grossIncome: 1_100_000,
     filingStatus: "single",
     state: "CA",
+    taxYear: 2025,
   });
   const caTaxable = 1_100_000 - 5706; // 1,094,294
   const expectedMHT = (caTaxable - 1_000_000) * 0.01;
@@ -121,6 +129,48 @@ console.log("\n== estimateTax: federal + CA end-to-end checks ==");
     const mfjMin = FEDERAL_BRACKETS.mfj[i].min;
     const mfsMin = FEDERAL_BRACKETS.mfs[i].min;
     check(`MFS bracket ${i} min == half of MFJ min`, mfsMin, mfjMin / 2);
+  }
+}
+
+console.log("\n== 2026 config: sanity checks against IRS Rev. Proc. 2025-32 ==");
+{
+  check("2026 single standard deduction", DATA_2026.federalStandardDeduction.single, 16100);
+  check("2026 MFJ standard deduction", DATA_2026.federalStandardDeduction.mfj, 32200);
+  check("2026 HoH standard deduction", DATA_2026.federalStandardDeduction.hoh, 24150);
+
+  // $80,000 gross, single, 2026: taxable = 80000 - 16100 = 63900.
+  // 10%: 12400 -> 1240.00; 12%: (50400-12400)=38000 -> 4560.00;
+  // 22%: (63900-50400)=13500 -> 2970.00
+  const result = estimateTax({
+    grossIncome: 80000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+  });
+  check("2026 federal taxable income", result.federalTaxableIncome, 63900);
+  check("2026 federal tax", result.federalTax, 1240 + 4560 + 2970);
+  check("2026 federal marginal rate", result.federalMarginalRate, 0.22);
+
+  // MFS should still be exactly half of MFJ at every 2026 threshold.
+  for (let i = 0; i < DATA_2026.federalBrackets.mfj.length; i++) {
+    const mfjMin = DATA_2026.federalBrackets.mfj[i].min;
+    const mfsMin = DATA_2026.federalBrackets.mfs[i].min;
+    check(`2026 MFS bracket ${i} min == half of MFJ min`, mfsMin, mfjMin / 2);
+  }
+
+  // CA 2026 figures are an explicitly-flagged placeholder pending FTB publication.
+  const caResult = estimateTax({
+    grossIncome: 80000,
+    filingStatus: "single",
+    state: "CA",
+    taxYear: 2026,
+  });
+  if (caResult.caDataIsProvisional) {
+    passed++;
+    console.log("  PASS  2026 CA data is flagged as provisional");
+  } else {
+    failed++;
+    console.error("  FAIL  2026 CA data should be flagged as provisional");
   }
 }
 

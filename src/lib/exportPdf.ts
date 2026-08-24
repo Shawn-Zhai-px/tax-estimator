@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { TaxEstimateResult } from "./calculateTax";
 import { formatCurrency, formatPercent } from "./format";
-import { FILING_STATUS_LABELS } from "./taxData";
+import { FILING_STATUS_LABELS } from "@/config";
 
 export function exportResultToPdf(result: TaxEstimateResult) {
   const doc = new jsPDF({ unit: "pt", format: "letter" });
@@ -63,6 +63,37 @@ export function exportResultToPdf(result: TaxEstimateResult) {
         9.5
       );
     }
+  }
+
+  spacer(14);
+  line("Federal Form 1040 line reference", 13, true);
+  line(`1a  Wages (from Form W-2, box 1): ${formatCurrency(result.grossIncome)}`, 9.5);
+  line(`9   Total income: ${formatCurrency(result.grossIncome)}`, 9.5);
+  line(`11  Adjusted gross income (AGI): ${formatCurrency(result.grossIncome)}`, 9.5);
+  line(
+    `12  ${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction: ${formatCurrency(result.deductionUsed)}`,
+    9.5
+  );
+  line(`15  Taxable income: ${formatCurrency(result.federalTaxableIncome)}`, 9.5);
+  line(`16  Tax: ${formatCurrency(result.federalTax)}`, 9.5);
+  line(`24  Total tax: ${formatCurrency(result.federalTax)}`, 9.5);
+
+  if (result.state === "CA") {
+    const taxBeforeCredits = result.stateTax - result.caMentalHealthTax;
+    spacer(10);
+    line(
+      `California Form 540 line reference${result.caDataIsProvisional ? " (CA figures provisional — FTB hasn't published them yet)" : ""}`,
+      13,
+      true
+    );
+    line(`12  State wages (from Form W-2, box 16): ${formatCurrency(result.grossIncome)}`, 9.5);
+    line(`13  Federal adjusted gross income (AGI): ${formatCurrency(result.grossIncome)}`, 9.5);
+    line(`18  CA standard deduction: ${formatCurrency(result.caDeductionUsed)}`, 9.5);
+    line(`19  CA taxable income: ${formatCurrency(result.stateTaxableIncome)}`, 9.5);
+    line(`31  Tax (before credits): ${formatCurrency(taxBeforeCredits)}`, 9.5);
+    line(`48  Tax after credits (no credits modeled): ${formatCurrency(taxBeforeCredits)}`, 9.5);
+    line(`62  Behavioral Health Services Tax: ${formatCurrency(result.caMentalHealthTax)}`, 9.5);
+    line(`64  Total tax: ${formatCurrency(result.stateTax)}`, 9.5);
   }
 
   spacer(16);

@@ -8,3 +8,6 @@ npm-debug.log*
 .env*.local
 .vercel
 next-env.d.ts
+
+# Local planning notes — not meant for the remote repo
+/docs/my_plan/

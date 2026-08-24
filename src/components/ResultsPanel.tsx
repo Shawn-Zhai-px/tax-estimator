@@ -2,7 +2,9 @@
 
 import { TaxEstimateResult } from "@/lib/calculateTax";
 import { formatCurrency, formatPercent } from "@/lib/format";
-import { FILING_STATUS_LABELS } from "@/lib/taxData";
+import { FILING_STATUS_LABELS } from "@/config";
+import Form1040Summary from "./Form1040Summary";
+import Form540Summary from "./Form540Summary";
 
 interface ResultsPanelProps {
   result: TaxEstimateResult;
@@ -37,6 +39,14 @@ export default function ResultsPanel({
 }: ResultsPanelProps) {
   return (
     <div className="space-y-6">
+      {result.state === "CA" && result.caDataIsProvisional && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          CA's official {result.taxYear} bracket/standard-deduction figures
+          haven't been published by the FTB yet — the numbers below carry
+          forward the last published (2025) CA figures as a placeholder and
+          will change once the FTB releases the real {result.taxYear} schedule.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile label="Federal tax" value={formatCurrency(result.federalTax)} />
         <StatTile
@@ -112,6 +122,18 @@ export default function ResultsPanel({
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-900">California bracket breakdown</h3>
           <BracketTable rows={result.stateBracketBreakdown} />
+        </div>
+      )}
+
+      <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 className="text-sm font-semibold text-slate-900">Federal Form 1040 line reference</h3>
+        <Form1040Summary result={result} />
+      </div>
+
+      {result.state === "CA" && (
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="text-sm font-semibold text-slate-900">California Form 540 line reference</h3>
+          <Form540Summary result={result} />
         </div>
       )}
 

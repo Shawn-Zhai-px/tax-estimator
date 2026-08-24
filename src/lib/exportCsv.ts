@@ -1,5 +1,5 @@
 import { TaxEstimateResult } from "./calculateTax";
-import { FILING_STATUS_LABELS } from "./taxData";
+import { FILING_STATUS_LABELS } from "@/config";
 
 function csvEscape(value: string | number): string {
   const s = String(value);
@@ -73,6 +73,46 @@ export function exportResultToCsv(result: TaxEstimateResult) {
         ])
       );
     }
+  }
+
+  rows.push("");
+  rows.push(toRow([`Federal Form 1040 line reference (${result.taxYear})`]));
+  rows.push(toRow(["Line", "Label", "Amount"]));
+  rows.push(toRow(["1a", "Wages (from Form W-2, box 1)", result.grossIncome]));
+  rows.push(toRow(["9", "Total income", result.grossIncome]));
+  rows.push(toRow(["11", "Adjusted gross income (AGI)", result.grossIncome]));
+  rows.push(
+    toRow([
+      "12",
+      `${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction`,
+      result.deductionUsed,
+    ])
+  );
+  rows.push(toRow(["15", "Taxable income", result.federalTaxableIncome.toFixed(2)]));
+  rows.push(toRow(["16", "Tax", result.federalTax.toFixed(2)]));
+  rows.push(toRow(["24", "Total tax", result.federalTax.toFixed(2)]));
+
+  if (result.state === "CA") {
+    const taxBeforeCredits = result.stateTax - result.caMentalHealthTax;
+    rows.push("");
+    rows.push(
+      toRow([
+        `California Form 540 line reference (${result.taxYear}${
+          result.caDataIsProvisional ? " — CA figures provisional, FTB has not published them yet" : ""
+        })`,
+      ])
+    );
+    rows.push(toRow(["Line", "Label", "Amount"]));
+    rows.push(toRow(["12", "State wages (from Form W-2, box 16)", result.grossIncome]));
+    rows.push(toRow(["13", "Federal adjusted gross income (AGI)", result.grossIncome]));
+    rows.push(toRow(["18", "CA standard deduction", result.caDeductionUsed]));
+    rows.push(toRow(["19", "CA taxable income", result.stateTaxableIncome.toFixed(2)]));
+    rows.push(toRow(["31", "Tax (before credits)", taxBeforeCredits.toFixed(2)]));
+    rows.push(toRow(["48", "Tax after credits (no credits modeled)", taxBeforeCredits.toFixed(2)]));
+    rows.push(
+      toRow(["62", "Behavioral Health Services Tax (formerly Mental Health Services Tax)", result.caMentalHealthTax.toFixed(2)])
+    );
+    rows.push(toRow(["64", "Total tax", result.stateTax.toFixed(2)]));
   }
 
   rows.push("");

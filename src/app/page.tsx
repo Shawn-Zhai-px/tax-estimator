@@ -10,6 +10,7 @@ import { exportResultToPdf } from "@/lib/exportPdf";
 import { exportResultToCsv } from "@/lib/exportCsv";
 
 const DEFAULT_VALUES: TaxFormValues = {
+  taxYear: 2025,
   grossIncome: "75000",
   filingStatus: "single",
   state: "CA",
@@ -17,8 +18,11 @@ const DEFAULT_VALUES: TaxFormValues = {
   itemizedDeduction: "",
 };
 
+type Step = "input" | "results";
+
 export default function Home() {
   const [values, setValues] = useState<TaxFormValues>(DEFAULT_VALUES);
+  const [step, setStep] = useState<Step>("input");
 
   const result = useMemo(() => {
     const grossIncome = Number(values.grossIncome) || 0;
@@ -31,12 +35,13 @@ export default function Home() {
       grossIncome,
       filingStatus: values.filingStatus,
       state: values.state,
+      taxYear: values.taxYear,
       itemizedDeduction,
     });
   }, [values]);
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
       <header className="mb-6 flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
@@ -55,14 +60,31 @@ export default function Home() {
         <DisclaimerBanner />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[360px_1fr]">
-        <TaxForm values={values} onChange={setValues} />
-        <ResultsPanel
-          result={result}
-          onExportPdf={() => exportResultToPdf(result)}
-          onExportCsv={() => exportResultToCsv(result)}
-        />
-      </div>
+      {step === "input" ? (
+        <div className="mx-auto max-w-xl">
+          <TaxForm values={values} onChange={setValues} />
+          <button
+            onClick={() => setStep("results")}
+            className="mt-4 w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+          >
+            Calculate →
+          </button>
+        </div>
+      ) : (
+        <div>
+          <button
+            onClick={() => setStep("input")}
+            className="mb-4 text-sm text-brand-600 hover:underline"
+          >
+            ← Edit inputs
+          </button>
+          <ResultsPanel
+            result={result}
+            onExportPdf={() => exportResultToPdf(result)}
+            onExportCsv={() => exportResultToCsv(result)}
+          />
+        </div>
+      )}
 
       <footer className="mt-10 border-t border-slate-200 pt-4 text-xs text-slate-400">
         Tax year {result.taxYear} federal brackets/standard deduction and California
