@@ -42,11 +42,13 @@ function DollarInput({
   label,
   value,
   onChange,
+  step = 100,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
+  step?: number;
 }) {
   return (
     <div>
@@ -62,7 +64,7 @@ function DollarInput({
           type="number"
           inputMode="decimal"
           min={0}
-          step={100}
+          step={step}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
@@ -98,27 +100,12 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         </select>
       </div>
 
-      <div>
-        <label htmlFor="grossIncome" className="block text-sm font-medium text-slate-700">
-          Wages / gross annual income (W-2, 税前年收入, USD)
-        </label>
-        <div className="relative mt-1">
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-            $
-          </span>
-          <input
-            id="grossIncome"
-            type="number"
-            inputMode="decimal"
-            min={0}
-            step={100}
-            value={values.grossIncome}
-            onChange={(e) => update("grossIncome", e.target.value)}
-            placeholder="0"
-            className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-          />
-        </div>
-      </div>
+      <DollarInput
+        id="grossIncome"
+        label="Wages / gross annual income (W-2, 税前年收入, USD)"
+        value={values.grossIncome}
+        onChange={(v) => update("grossIncome", v)}
+      />
 
       <div>
         <label htmlFor="filingStatus" className="block text-sm font-medium text-slate-700">
@@ -316,25 +303,13 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         </p>
 
         <div>
-          <label htmlFor="studentLoanInterestPaid" className="block text-sm font-medium text-slate-700">
-            Student loan interest paid
-          </label>
-          <div className="relative mt-1">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-              $
-            </span>
-            <input
-              id="studentLoanInterestPaid"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={10}
-              value={values.studentLoanInterestPaid}
-              onChange={(e) => update("studentLoanInterestPaid", e.target.value)}
-              placeholder="0"
-              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <DollarInput
+            id="studentLoanInterestPaid"
+            label="Student loan interest paid"
+            value={values.studentLoanInterestPaid}
+            onChange={(v) => update("studentLoanInterestPaid", v)}
+            step={10}
+          />
           <p className="mt-1 text-xs text-slate-500">
             Capped at $2,500 and phased out at higher incomes. Not available
             if your filing status is Married Filing Separately.

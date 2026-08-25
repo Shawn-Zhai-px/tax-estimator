@@ -32,6 +32,45 @@ export const STATES: { code: StateCode; label: string }[] = [
   { code: "TX", label: "Texas (no state income tax)" },
 ];
 
+interface DependentCareCreditBase {
+  /** Expense cap when claiming for one qualifying person. */
+  expenseCapOnePerson: number;
+  /** Expense cap when claiming for two or more qualifying persons. */
+  expenseCapTwoOrMorePersons: number;
+  maxRatePercent: number;
+  floorRatePercent: number;
+  /** True if this year's rate schedule is a best-effort approximation (see calculateDependentCareCreditRate). */
+  isRateApproximate: boolean;
+}
+
+/**
+ * 2018-TCJA-style stepped schedule: rate steps down 1 point per $2,000 (or
+ * fraction) of AGI over `stepDownStartAgi`, floored at `floorRatePercent`.
+ * Same dollar amount for every filing status.
+ */
+export interface DependentCareCreditStepped extends DependentCareCreditBase {
+  schedule: "stepped";
+  stepDownStartAgi: number;
+}
+
+/**
+ * OBBBA-style smooth approximation: four AGI breakpoints per filing-status
+ * group — [maxRateEndsAt, midPlateauStarts, midPlateauEnds, floorStartsAt].
+ * Rate is `maxRatePercent` up to the first breakpoint, linearly interpolates
+ * down to `midRatePercent` by the second, holds flat until the third, then
+ * linearly interpolates down to `floorRatePercent` by the fourth.
+ */
+export interface DependentCareCreditSmooth extends DependentCareCreditBase {
+  schedule: "smooth";
+  midRatePercent: number;
+  agiBreakpoints: {
+    other: [number, number, number, number];
+    mfj: [number, number, number, number];
+  };
+}
+
+export type DependentCareCreditConfig = DependentCareCreditStepped | DependentCareCreditSmooth;
+
 /** Shape of one tax year's worth of federal + CA reference data. */
 export interface YearTaxData {
   taxYear: number;
@@ -78,37 +117,7 @@ export interface YearTaxData {
   saltFloorMfs: number;
 
   /** Child and Dependent Care Credit (Form 2441 / IRC §21) parameters. */
-  dependentCareCredit: {
-    /** Expense cap when claiming for one qualifying person. */
-    expenseCapOnePerson: number;
-    /** Expense cap when claiming for two or more qualifying persons. */
-    expenseCapTwoOrMorePersons: number;
-    maxRatePercent: number;
-    floorRatePercent: number;
-    /** True if this year's rate schedule is a best-effort approximation (see calculateDependentCareCreditRate). */
-    isRateApproximate: boolean;
-    /**
-     * 2018-TCJA-style stepped schedule: rate steps down 1 point per $2,000
-     * (or fraction) of AGI over this amount, floored at floorRatePercent.
-     * Same dollar amount for every filing status. Mutually exclusive with
-     * `agiBreakpoints` — only one of the two is set per year.
-     */
-    stepDownStartAgi?: number;
-    /**
-     * OBBBA-style smooth approximation: four AGI breakpoints
-     * [maxRateEndsAt, midPlateauStarts, midPlateauEnds, floorStartsAt].
-     * Rate is maxRatePercent up to the first breakpoint, linearly
-     * interpolates down to midRatePercent by the second, holds flat until
-     * the third, then linearly interpolates down to floorRatePercent by
-     * the fourth. MFJ gets its own (roughly doubled) breakpoints.
-     */
-    agiBreakpoints?: {
-      other: [number, number, number, number];
-      mfj: [number, number, number, number];
-    };
-    /** Only meaningful alongside `agiBreakpoints` — the flat mid-plateau rate. */
-    midRatePercent?: number;
-  };
+  dependentCareCredit: DependentCareCreditConfig;
 
   /** Long-term capital gains / qualified dividends preferential-rate brackets (0%/15%/20%). */
   capitalGainsBrackets: Record<FilingStatus, TaxBracket[]>;

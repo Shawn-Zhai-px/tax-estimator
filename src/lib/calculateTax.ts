@@ -270,8 +270,8 @@ function calculateSaltDeduction(
 /**
  * Child and Dependent Care Credit rate for a given AGI/filing status —
  * either the well-established 2018-TCJA-era stepped schedule
- * (`stepDownStartAgi` set) or the post-OBBBA smooth piecewise-linear
- * approximation (`agiBreakpoints` set). See the sourcing comments in
+ * (`schedule: "stepped"`) or the post-OBBBA smooth piecewise-linear
+ * approximation (`schedule: "smooth"`). See the sourcing comments in
  * `../config/2025/taxData.ts` / `../config/2026/taxData.ts`.
  */
 function calculateDependentCareCreditRate(
@@ -279,7 +279,7 @@ function calculateDependentCareCreditRate(
   filingStatus: FilingStatus,
   dc: ReturnType<typeof getTaxDataForYear>["dependentCareCredit"]
 ): number {
-  if (dc.agiBreakpoints && dc.midRatePercent !== undefined) {
+  if (dc.schedule === "smooth") {
     const [t1, t2, t3, t4] = filingStatus === "mfj" ? dc.agiBreakpoints.mfj : dc.agiBreakpoints.other;
     if (magi <= t1) return dc.maxRatePercent / 100;
     if (magi <= t2) {
@@ -294,8 +294,7 @@ function calculateDependentCareCreditRate(
     return dc.floorRatePercent / 100;
   }
 
-  const start = dc.stepDownStartAgi ?? 0;
-  const steps = Math.ceil(clampToZero(magi - start) / 2000);
+  const steps = Math.ceil(clampToZero(magi - dc.stepDownStartAgi) / 2000);
   return Math.max(dc.floorRatePercent, dc.maxRatePercent - steps) / 100;
 }
 
@@ -377,6 +376,20 @@ export function applyBrackets(
   }
 
   return { tax, marginalRate, breakdown };
+}
+
+/** Total tax only, no breakdown — for callers (like the capital-gains stacking diff below) that don't need the row-by-row detail. */
+function totalBracketTax(taxableIncome: number, brackets: TaxBracket[]): number {
+  let remaining = clampToZero(taxableIncome);
+  let tax = 0;
+  for (const bracket of brackets) {
+    if (remaining <= 0) break;
+    const bracketSpan = bracket.max === null ? remaining : bracket.max - bracket.min;
+    const amountInBracket = Math.min(remaining, bracketSpan);
+    tax += amountInBracket * bracket.rate;
+    remaining -= amountInBracket;
+  }
+  return tax;
 }
 
 export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
@@ -461,8 +474,8 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
   const ordinaryResult = applyBrackets(ordinaryTaxableIncome, federalBrackets);
   const capitalGainsBrackets = yearData.capitalGainsBrackets[filingStatus];
   const capitalGainsTax =
-    applyBrackets(ordinaryTaxableIncome + capGainsInTaxableIncome, capitalGainsBrackets).tax -
-    applyBrackets(ordinaryTaxableIncome, capitalGainsBrackets).tax;
+    totalBracketTax(ordinaryTaxableIncome + capGainsInTaxableIncome, capitalGainsBrackets) -
+    totalBracketTax(ordinaryTaxableIncome, capitalGainsBrackets);
   const federalTaxBeforeCredits = ordinaryResult.tax + capitalGainsTax;
 
   // --- Child Tax Credit / Credit for Other Dependents ---

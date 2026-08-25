@@ -123,6 +123,7 @@ export const TAX_DATA_2026: YearTaxData = {
   // and surfaced in the UI. Revisit once the IRS publishes the final 2026
   // Form 2441 instructions.
   dependentCareCredit: {
+    schedule: "smooth",
     expenseCapOnePerson: 3000,
     expenseCapTwoOrMorePersons: 6000,
     maxRatePercent: 50,

@@ -150,6 +150,7 @@ export const TAX_DATA_2025: YearTaxData = {
   // dollar thresholds for every filing status (this credit, unlike CTC,
   // has never doubled its AGI thresholds for MFJ).
   dependentCareCredit: {
+    schedule: "stepped",
     expenseCapOnePerson: 3000,
     expenseCapTwoOrMorePersons: 6000,
     maxRatePercent: 35,
