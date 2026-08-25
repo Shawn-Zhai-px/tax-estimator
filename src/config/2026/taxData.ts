@@ -103,4 +103,68 @@ export const TAX_DATA_2026: YearTaxData = {
     singleHoh: { lower: 85_000, upper: 100_000 },
     mfj: { lower: 175_000, upper: 205_000 },
   },
+  // IRC §164(b)(7): 2026 SALT cap and phase-down threshold are indexed +1%
+  // over 2025 — $40,400 ($20,200 MFS) cap, $505,000 ($252,500 MFS)
+  // phase-down threshold, same 30% rate and $10,000/$5,000 floor.
+  saltCap: 40_400,
+  saltCapMfs: 20_200,
+  saltPhaseDownThreshold: 505_000,
+  saltPhaseDownThresholdMfs: 252_500,
+  saltFloor: 10_000,
+  saltFloorMfs: 5_000,
+  // Form 2441 / IRC §21, as amended by OBBBA: starting 2026 the maximum
+  // Dependent Care Credit rate rises from 35% to 50%. Sources agree on the
+  // overall shape (50% at AGI <= $15,000/$30,000 MFJ, a flat 35% plateau
+  // from $43,000-$75,000 ($86,000-$150,000 MFJ), floor 20% above
+  // $103,000/$206,000) but disagree on the exact intermediate step
+  // mechanics, so this is modeled as a smooth piecewise-linear
+  // approximation between those anchor points rather than the real
+  // (still-unconfirmed) stepped table — flagged via `isRateApproximate`
+  // and surfaced in the UI. Revisit once the IRS publishes the final 2026
+  // Form 2441 instructions.
+  dependentCareCredit: {
+    expenseCapOnePerson: 3000,
+    expenseCapTwoOrMorePersons: 6000,
+    maxRatePercent: 50,
+    midRatePercent: 35,
+    floorRatePercent: 20,
+    isRateApproximate: true,
+    agiBreakpoints: {
+      other: [15_000, 43_000, 75_000, 103_000],
+      mfj: [30_000, 86_000, 150_000, 206_000],
+    },
+  },
+  // IRS Rev. Proc. 2025-32: 2026 long-term capital gains / qualified
+  // dividends preferential-rate brackets (inflation-indexed from 2025).
+  capitalGainsBrackets: {
+    single: [
+      { min: 0, max: 49_450, rate: 0 },
+      { min: 49_450, max: 545_500, rate: 0.15 },
+      { min: 545_500, max: null, rate: 0.2 },
+    ],
+    mfj: [
+      { min: 0, max: 98_900, rate: 0 },
+      { min: 98_900, max: 613_700, rate: 0.15 },
+      { min: 613_700, max: null, rate: 0.2 },
+    ],
+    hoh: [
+      { min: 0, max: 66_200, rate: 0 },
+      { min: 66_200, max: 579_600, rate: 0.15 },
+      { min: 579_600, max: null, rate: 0.2 },
+    ],
+    mfs: [
+      { min: 0, max: 49_450, rate: 0 },
+      { min: 49_450, max: 306_850, rate: 0.15 },
+      { min: 306_850, max: null, rate: 0.2 },
+    ],
+  },
+  // IRS 2026 HSA/401(k)/IRA limit announcements: HSA $4,400 self-only /
+  // $8,750 family; 401(k)/403(b) elective deferral $24,500 (same figure
+  // independently used in ../../lib/paycheckData.ts's
+  // FOUR_ZERO_ONE_K_ANNUAL_LIMIT); traditional IRA $7,500. Age-50+/55+
+  // catch-up amounts are not modeled.
+  hsaLimitSelfOnly: 4_400,
+  hsaLimitFamily: 8_750,
+  traditional401kLimit: 24_500,
+  traditionalIraLimit: 7_500,
 };

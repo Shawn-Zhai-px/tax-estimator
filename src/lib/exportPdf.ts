@@ -32,24 +32,57 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   if (result.qualifyingChildren > 0 || result.otherDependents > 0) {
     line(`Dependents: ${result.qualifyingChildren} qualifying child(ren), ${result.otherDependents} other`);
   }
+  if (result.federalItemizedTotal > 0) {
+    line(`Itemized deduction items: mortgage interest ${formatCurrency(result.mortgageInterest)}, SALT (capped) ${formatCurrency(result.saltDeductible)}, charitable ${formatCurrency(result.charitableDonations)}, medical (over threshold) ${formatCurrency(result.medicalDeductible)}`);
+  }
+  if (result.dependentCareExpenses > 0) {
+    line(`Dependent care: ${formatCurrency(result.dependentCareExpenses)} for ${result.dependentCareQualifyingPersons} qualifying person(s)`);
+  }
+  if (result.qualifiedDividendsAndLTCG > 0) {
+    line(`Capital gains / qualified dividends: ${formatCurrency(result.qualifiedDividendsAndLTCG)}`);
+  }
+  if (result.hsaContribution > 0 || result.traditional401kContribution > 0 || result.traditionalIraContribution > 0) {
+    line(
+      `Retirement/HSA contributions: 401(k) ${formatCurrency(result.traditional401kContribution)}, IRA ${formatCurrency(result.traditionalIraContribution)}, HSA ${formatCurrency(result.hsaContribution)} (${result.hsaCoverageType})`
+    );
+  }
   line(`Filing status: ${FILING_STATUS_LABELS[result.filingStatus]}`);
   line(`State: ${result.state}`);
   line(`Federal deduction used (${result.deductionType}): ${formatCurrency(result.deductionUsed)}`);
   spacer(10);
 
   line("Results", 13, true);
-  if (result.selfEmploymentNetIncome > 0) {
+  if (result.selfEmploymentNetIncome > 0 || result.qualifiedDividendsAndLTCG > 0) {
     line(`Total income: ${formatCurrency(result.totalIncome)}`);
     line(`Federal AGI (after adjustments): ${formatCurrency(result.federalAGI)}`);
   }
   line(`Federal taxable income: ${formatCurrency(result.federalTaxableIncome)}`);
+  if (result.capitalGainsTax > 0) {
+    line(`  incl. capital gains tax (0%/15%/20%): ${formatCurrency(result.capitalGainsTax)}`);
+  }
   if (result.dependentCreditAmount > 0) {
     line(`  less Child Tax Credit / Credit for Other Dependents: ${formatCurrency(result.dependentCreditAmount)}`);
   }
+  if (result.dependentCareCreditAmount > 0) {
+    line(
+      `  less dependent care credit${result.dependentCareCreditIsApproximate ? " (approx. rate)" : ""}: ${formatCurrency(result.dependentCareCreditAmount)}`
+    );
+  }
   line(`Federal income tax: ${formatCurrency(result.federalTax)}  (marginal rate ${formatPercent(result.federalMarginalRate)})`);
-  if (result.selfEmploymentTax > 0) {
-    line(`  plus self-employment tax: ${formatCurrency(result.selfEmploymentTax)}`);
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+    if (result.selfEmploymentTax > 0) {
+      line(`  plus self-employment tax: ${formatCurrency(result.selfEmploymentTax)}`);
+    }
+    if (result.netInvestmentIncomeTax > 0) {
+      line(`  plus Net Investment Income Tax (3.8%): ${formatCurrency(result.netInvestmentIncomeTax)}`);
+    }
     line(`Federal total tax: ${formatCurrency(result.federalTotalTax)}`, 11, true);
+  }
+  if (result.state === "CA") {
+    if (result.hsaDeduction > 0) {
+      line(`CA AGI (HSA not deductible for CA): ${formatCurrency(result.caAGI)}`);
+    }
+    line(`CA deduction used (${result.caDeductionType}): ${formatCurrency(result.caDeductionUsed)}`);
   }
   line(`State taxable income: ${formatCurrency(result.stateTaxableIncome)}`);
   line(`State tax: ${formatCurrency(result.stateTax)}  (marginal rate ${formatPercent(result.stateMarginalRate)})`);
@@ -85,12 +118,18 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   spacer(14);
   line("Federal Form 1040 line reference", 13, true);
   line(`1a  Wages (from Form W-2, box 1): ${formatCurrency(result.grossIncome)}`, 9.5);
+  if (result.qualifiedDividendsAndLTCG > 0) {
+    line(`7   Capital gain (or loss): ${formatCurrency(result.qualifiedDividendsAndLTCG)}`, 9.5);
+  }
   if (result.selfEmploymentNetIncome > 0) {
     line(`8   Additional income (Schedule 1: self-employment profit): ${formatCurrency(result.selfEmploymentNetIncome)}`, 9.5);
   }
   line(`9   Total income: ${formatCurrency(result.totalIncome)}`, 9.5);
   if (result.totalAdjustments > 0) {
-    line(`10  Adjustments to income (½ SE tax + student loan interest): ${formatCurrency(result.totalAdjustments)}`, 9.5);
+    line(
+      `10  Adjustments to income (½ SE tax, student loan interest, HSA/401(k)/IRA): ${formatCurrency(result.totalAdjustments)}`,
+      9.5
+    );
   }
   line(`11  Adjusted gross income (AGI): ${formatCurrency(result.federalAGI)}`, 9.5);
   line(
@@ -102,9 +141,22 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   if (result.dependentCreditAmount > 0) {
     line(`19  Child tax credit / credit for other dependents: ${formatCurrency(result.dependentCreditAmount)}`, 9.5);
   }
+  if (result.dependentCareCreditAmount > 0) {
+    line(
+      `20  Schedule 3: dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}: ${formatCurrency(result.dependentCareCreditAmount)}`,
+      9.5
+    );
+  }
   line(`22  Subtotal after credits: ${formatCurrency(result.federalTax)}`, 9.5);
-  if (result.selfEmploymentTax > 0) {
-    line(`23  Other taxes (Schedule 2: self-employment tax): ${formatCurrency(result.selfEmploymentTax)}`, 9.5);
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+    const otherTaxParts = [
+      result.selfEmploymentTax > 0 ? "self-employment tax" : null,
+      result.netInvestmentIncomeTax > 0 ? "Net Investment Income Tax" : null,
+    ].filter(Boolean);
+    line(
+      `23  Other taxes (Schedule 2: ${otherTaxParts.join(" + ")}): ${formatCurrency(result.selfEmploymentTax + result.netInvestmentIncomeTax)}`,
+      9.5
+    );
   }
   line(`24  Total tax: ${formatCurrency(result.federalTotalTax)}`, 9.5);
 
@@ -118,7 +170,14 @@ export function exportResultToPdf(result: TaxEstimateResult) {
     );
     line(`12  State wages (from Form W-2, box 16): ${formatCurrency(result.grossIncome)}`, 9.5);
     line(`13  Federal adjusted gross income (AGI): ${formatCurrency(result.federalAGI)}`, 9.5);
-    line(`18  CA standard deduction: ${formatCurrency(result.caDeductionUsed)}`, 9.5);
+    if (result.hsaDeduction > 0) {
+      line(`16  CA adjustments: addition (HSA deduction not allowed by CA): ${formatCurrency(result.hsaDeduction)}`, 9.5);
+      line(`17  California adjusted gross income: ${formatCurrency(result.caAGI)}`, 9.5);
+    }
+    line(
+      `18  CA ${result.caDeductionType === "itemized" ? "itemized" : "standard"} deduction: ${formatCurrency(result.caDeductionUsed)}`,
+      9.5
+    );
     line(`19  CA taxable income: ${formatCurrency(result.stateTaxableIncome)}`, 9.5);
     line(`31  Tax (before credits): ${formatCurrency(taxBeforeCredits)}`, 9.5);
     line(`48  Tax after credits (no credits modeled): ${formatCurrency(taxBeforeCredits)}`, 9.5);
@@ -131,10 +190,10 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   doc.setFillColor("#FFFBEB");
   const disclaimerY = y;
   const disclaimerText = doc.splitTextToSize(
-    "Disclaimer: This is an unofficial, simplified estimate based on standard deductions and published federal/CA tax brackets. " +
-      "It excludes credits, most itemized deductions, payroll taxes (Social Security/Medicare/CA SDI), AMT, and other factors that " +
-      "affect an actual tax bill. It is not prepared by a tax professional and is not a substitute for filing software or a licensed " +
-      "CPA / tax preparer. Verify all figures against current IRS and state guidance before relying on them.",
+    "Disclaimer: This is an unofficial, simplified estimate. Deduction/credit amounts (mortgage interest, SALT, medical, dependent " +
+      "care, retirement/HSA contributions, capital gains, NIIT, etc.) are computed from what you entered, not verified against any " +
+      "documents. Excludes EITC, education credits, AMT, QBI, and payroll taxes on W-2 wages. It is not prepared by a tax " +
+      "professional and is not a substitute for filing software or a licensed CPA / tax preparer. Verify all figures against current IRS and state guidance before relying on them.",
     500
   );
   doc.rect(marginX - 8, disclaimerY - 12, 512, disclaimerText.length * 12 + 16, "FD");

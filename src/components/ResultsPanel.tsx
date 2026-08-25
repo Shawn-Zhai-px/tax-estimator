@@ -47,11 +47,25 @@ export default function ResultsPanel({
           will change once the FTB releases the real {result.taxYear} schedule.
         </div>
       )}
+      {result.dependentCareCreditIsApproximate && result.dependentCareCreditAmount > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          The {result.taxYear} Dependent Care Credit rate below is an
+          approximation of OBBBA's new (higher) schedule — sources disagree
+          on the exact intermediate brackets, so this is smoothed between
+          the confirmed anchor points pending final IRS Form 2441 guidance.
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile
           label="Federal tax"
           value={formatCurrency(result.federalTotalTax)}
-          sub={result.selfEmploymentTax > 0 ? `incl. ${formatCurrency(result.selfEmploymentTax)} SE tax` : undefined}
+          sub={(() => {
+            const parts = [
+              result.selfEmploymentTax > 0 ? `${formatCurrency(result.selfEmploymentTax)} SE tax` : null,
+              result.netInvestmentIncomeTax > 0 ? `${formatCurrency(result.netInvestmentIncomeTax)} NIIT` : null,
+            ].filter(Boolean);
+            return parts.length > 0 ? `incl. ${parts.join(" + ")}` : undefined;
+          })()}
         />
         <StatTile
           label={result.state === "CA" ? "CA state tax" : "State tax"}
@@ -102,10 +116,16 @@ export default function ResultsPanel({
               <dd className="font-medium">{formatCurrency(result.totalIncome)}</dd>
             </div>
           )}
+          {result.qualifiedDividendsAndLTCG > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Capital gains / qualified dividends</dt>
+              <dd className="font-medium">{formatCurrency(result.qualifiedDividendsAndLTCG)}</dd>
+            </div>
+          )}
           {result.totalAdjustments > 0 && (
             <div className="flex justify-between border-b border-slate-100 py-1.5">
               <dt className="text-slate-500">
-                Adjustments (½ SE tax + student loan interest)
+                Adjustments (½ SE tax, student loan interest, HSA/401(k)/IRA)
               </dt>
               <dd className="font-medium">{formatCurrency(result.totalAdjustments)}</dd>
             </div>
@@ -114,6 +134,18 @@ export default function ResultsPanel({
             <div className="flex justify-between border-b border-slate-100 py-1.5">
               <dt className="text-slate-500">Federal AGI</dt>
               <dd className="font-medium">{formatCurrency(result.federalAGI)}</dd>
+            </div>
+          )}
+          {result.hsaDeduction > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">CA AGI (HSA not deductible for CA)</dt>
+              <dd className="font-medium">{formatCurrency(result.caAGI)}</dd>
+            </div>
+          )}
+          {result.federalItemizedTotal > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Federal itemized total</dt>
+              <dd className="font-medium">{formatCurrency(result.federalItemizedTotal)}</dd>
             </div>
           )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
@@ -126,6 +158,18 @@ export default function ResultsPanel({
             <dt className="text-slate-500">Federal taxable income</dt>
             <dd className="font-medium">{formatCurrency(result.federalTaxableIncome)}</dd>
           </div>
+          {result.capitalGainsTax > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Capital gains tax (0%/15%/20%)</dt>
+              <dd className="font-medium">{formatCurrency(result.capitalGainsTax)}</dd>
+            </div>
+          )}
+          {result.netInvestmentIncomeTax > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Net Investment Income Tax (3.8%)</dt>
+              <dd className="font-medium">{formatCurrency(result.netInvestmentIncomeTax)}</dd>
+            </div>
+          )}
           {result.dependentCreditAmount > 0 && (
             <div className="flex justify-between border-b border-slate-100 py-1.5">
               <dt className="text-slate-500">
@@ -134,10 +178,30 @@ export default function ResultsPanel({
               <dd className="font-medium">−{formatCurrency(result.dependentCreditAmount)}</dd>
             </div>
           )}
+          {result.dependentCareCreditAmount > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">
+                Dependent care credit{result.dependentCareCreditIsApproximate ? " (approx.)" : ""}
+              </dt>
+              <dd className="font-medium">−{formatCurrency(result.dependentCareCreditAmount)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
             <dt className="text-slate-500">Federal marginal rate</dt>
             <dd className="font-medium">{formatPercent(result.federalMarginalRate)}</dd>
           </div>
+          {result.state === "CA" && result.caItemizedTotal > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">CA itemized total</dt>
+              <dd className="font-medium">{formatCurrency(result.caItemizedTotal)}</dd>
+            </div>
+          )}
+          {result.state === "CA" && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">CA deduction ({result.caDeductionType})</dt>
+              <dd className="font-medium">{formatCurrency(result.caDeductionUsed)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
             <dt className="text-slate-500">State taxable income</dt>
             <dd className="font-medium">{formatCurrency(result.stateTaxableIncome)}</dd>

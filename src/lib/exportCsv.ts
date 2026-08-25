@@ -25,6 +25,18 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push(toRow(["Input", "Self-employment net income", result.selfEmploymentNetIncome]));
   rows.push(toRow(["Input", "Qualifying children", result.qualifyingChildren]));
   rows.push(toRow(["Input", "Other dependents", result.otherDependents]));
+  rows.push(toRow(["Input", "Mortgage interest", result.mortgageInterest]));
+  rows.push(toRow(["Input", "Property tax", result.propertyTax]));
+  rows.push(toRow(["Input", "State income tax paid", result.stateIncomeTaxPaid]));
+  rows.push(toRow(["Input", "Charitable donations", result.charitableDonations]));
+  rows.push(toRow(["Input", "Medical expenses", result.medicalExpenses]));
+  rows.push(toRow(["Input", "Dependent care expenses", result.dependentCareExpenses]));
+  rows.push(toRow(["Input", "Dependent care qualifying persons", result.dependentCareQualifyingPersons]));
+  rows.push(toRow(["Input", "Capital gains / qualified dividends", result.qualifiedDividendsAndLTCG]));
+  rows.push(toRow(["Input", "HSA contribution", result.hsaContribution]));
+  rows.push(toRow(["Input", "HSA coverage type", result.hsaCoverageType]));
+  rows.push(toRow(["Input", "Traditional 401(k)/403(b) contribution", result.traditional401kContribution]));
+  rows.push(toRow(["Input", "Traditional IRA contribution", result.traditionalIraContribution]));
   rows.push(toRow(["Input", "Filing status", FILING_STATUS_LABELS[result.filingStatus]]));
   rows.push(toRow(["Input", "State", result.state]));
   rows.push(toRow(["Input", "Federal deduction type", result.deductionType]));
@@ -35,19 +47,46 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   if (result.totalAdjustments > 0) {
     rows.push(toRow(["Result", "Adjustments to income", result.totalAdjustments.toFixed(2)]));
   }
+  if (result.federalItemizedTotal > 0) {
+    rows.push(toRow(["Result", "Federal itemized total", result.federalItemizedTotal.toFixed(2)]));
+  }
   rows.push(toRow(["Result", "Federal AGI", result.federalAGI.toFixed(2)]));
+  if (result.hsaDeduction > 0) {
+    rows.push(toRow(["Result", "CA AGI (HSA not deductible for CA)", result.caAGI.toFixed(2)]));
+  }
   rows.push(toRow(["Result", "Federal taxable income", result.federalTaxableIncome]));
+  if (result.capitalGainsTax > 0) {
+    rows.push(toRow(["Result", "Capital gains tax (0%/15%/20%)", result.capitalGainsTax.toFixed(2)]));
+  }
   rows.push(toRow(["Result", "Federal tax (before credits)", result.federalTaxBeforeCredits.toFixed(2)]));
   if (result.dependentCreditAmount > 0) {
     rows.push(toRow(["Result", "Child Tax Credit / Credit for Other Dependents", result.dependentCreditAmount.toFixed(2)]));
+  }
+  if (result.dependentCareCreditAmount > 0) {
+    rows.push(
+      toRow([
+        "Result",
+        `Dependent care credit${result.dependentCareCreditIsApproximate ? " (approximate rate schedule)" : ""}`,
+        result.dependentCareCreditAmount.toFixed(2),
+      ])
+    );
   }
   rows.push(toRow(["Result", "Federal income tax (after credits)", result.federalTax.toFixed(2)]));
   if (result.selfEmploymentTax > 0) {
     rows.push(toRow(["Result", "Self-employment tax", result.selfEmploymentTax.toFixed(2)]));
   }
+  if (result.netInvestmentIncomeTax > 0) {
+    rows.push(toRow(["Result", "Net Investment Income Tax (3.8%)", result.netInvestmentIncomeTax.toFixed(2)]));
+  }
   rows.push(toRow(["Result", "Federal total tax", result.federalTotalTax.toFixed(2)]));
   rows.push(toRow(["Result", "Federal marginal rate", result.federalMarginalRate]));
   rows.push(toRow(["Result", "Federal effective rate", result.federalEffectiveRate]));
+  if (result.state === "CA" && result.caItemizedTotal > 0) {
+    rows.push(toRow(["Result", "CA itemized total", result.caItemizedTotal.toFixed(2)]));
+  }
+  if (result.state === "CA") {
+    rows.push(toRow(["Result", "CA deduction type", result.caDeductionType]));
+  }
   rows.push(toRow(["Result", "State taxable income", result.stateTaxableIncome]));
   rows.push(toRow(["Result", "State tax", result.stateTax.toFixed(2)]));
   rows.push(toRow(["Result", "State marginal rate", result.stateMarginalRate]));
@@ -95,12 +134,21 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push(toRow([`Federal Form 1040 line reference (${result.taxYear})`]));
   rows.push(toRow(["Line", "Label", "Amount"]));
   rows.push(toRow(["1a", "Wages (from Form W-2, box 1)", result.grossIncome]));
+  if (result.qualifiedDividendsAndLTCG > 0) {
+    rows.push(toRow(["7", "Capital gain (or loss)", result.qualifiedDividendsAndLTCG]));
+  }
   if (result.selfEmploymentNetIncome > 0) {
     rows.push(toRow(["8", "Additional income (Schedule 1: self-employment profit)", result.selfEmploymentNetIncome]));
   }
   rows.push(toRow(["9", "Total income", result.totalIncome.toFixed(2)]));
   if (result.totalAdjustments > 0) {
-    rows.push(toRow(["10", "Adjustments to income (½ SE tax + student loan interest)", result.totalAdjustments.toFixed(2)]));
+    rows.push(
+      toRow([
+        "10",
+        "Adjustments to income (½ SE tax, student loan interest, HSA/401(k)/IRA)",
+        result.totalAdjustments.toFixed(2),
+      ])
+    );
   }
   rows.push(toRow(["11", "Adjusted gross income (AGI)", result.federalAGI.toFixed(2)]));
   rows.push(
@@ -115,9 +163,28 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   if (result.dependentCreditAmount > 0) {
     rows.push(toRow(["19", "Child tax credit / credit for other dependents", result.dependentCreditAmount.toFixed(2)]));
   }
+  if (result.dependentCareCreditAmount > 0) {
+    rows.push(
+      toRow([
+        "20",
+        `Schedule 3: dependent care credit${result.dependentCareCreditIsApproximate ? " (approximate)" : ""}`,
+        result.dependentCareCreditAmount.toFixed(2),
+      ])
+    );
+  }
   rows.push(toRow(["22", "Subtotal after credits", result.federalTax.toFixed(2)]));
-  if (result.selfEmploymentTax > 0) {
-    rows.push(toRow(["23", "Other taxes (Schedule 2: self-employment tax)", result.selfEmploymentTax.toFixed(2)]));
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+    const otherTaxParts = [
+      result.selfEmploymentTax > 0 ? "self-employment tax" : null,
+      result.netInvestmentIncomeTax > 0 ? "Net Investment Income Tax" : null,
+    ].filter(Boolean);
+    rows.push(
+      toRow([
+        "23",
+        `Other taxes (Schedule 2: ${otherTaxParts.join(" + ")})`,
+        (result.selfEmploymentTax + result.netInvestmentIncomeTax).toFixed(2),
+      ])
+    );
   }
   rows.push(toRow(["24", "Total tax", result.federalTotalTax.toFixed(2)]));
 
@@ -134,7 +201,19 @@ export function exportResultToCsv(result: TaxEstimateResult) {
     rows.push(toRow(["Line", "Label", "Amount"]));
     rows.push(toRow(["12", "State wages (from Form W-2, box 16)", result.grossIncome]));
     rows.push(toRow(["13", "Federal adjusted gross income (AGI)", result.federalAGI.toFixed(2)]));
-    rows.push(toRow(["18", "CA standard deduction", result.caDeductionUsed]));
+    if (result.hsaDeduction > 0) {
+      rows.push(
+        toRow(["16", "California adjustments: addition (HSA deduction not allowed by CA)", result.hsaDeduction.toFixed(2)])
+      );
+      rows.push(toRow(["17", "California adjusted gross income", result.caAGI.toFixed(2)]));
+    }
+    rows.push(
+      toRow([
+        "18",
+        `CA ${result.caDeductionType === "itemized" ? "itemized" : "standard"} deduction`,
+        result.caDeductionUsed,
+      ])
+    );
     rows.push(toRow(["19", "CA taxable income", result.stateTaxableIncome.toFixed(2)]));
     rows.push(toRow(["31", "Tax (before credits)", taxBeforeCredits.toFixed(2)]));
     rows.push(toRow(["48", "Tax after credits (no credits modeled)", taxBeforeCredits.toFixed(2)]));
@@ -147,7 +226,7 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push("");
   rows.push(
     toRow([
-      "Disclaimer: Unofficial simplified estimate. Excludes credits, most itemized deductions, payroll taxes, AMT. Not tax advice. Verify against IRS/state guidance or a licensed preparer.",
+      "Disclaimer: Unofficial simplified estimate. Excludes EITC, education credits, AMT, and QBI, and payroll taxes on W-2 wages. Deduction/credit amounts (mortgage interest, SALT, medical, dependent care, retirement/HSA contributions, capital gains, NIIT, etc.) are computed from what you entered, not verified against any documents. Not tax advice. Verify against IRS/state guidance or a licensed preparer.",
     ])
   );
 

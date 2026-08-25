@@ -14,12 +14,22 @@ const DEFAULT_VALUES: TaxFormValues = {
   grossIncome: "75000",
   filingStatus: "single",
   state: "CA",
-  useItemized: false,
-  itemizedDeduction: "",
   selfEmploymentNetIncome: "",
   qualifyingChildren: "",
   otherDependents: "",
   studentLoanInterestPaid: "",
+  mortgageInterest: "",
+  propertyTax: "",
+  stateIncomeTaxPaid: "",
+  charitableDonations: "",
+  medicalExpenses: "",
+  dependentCareExpenses: "",
+  dependentCareQualifyingPersons: "",
+  qualifiedDividendsAndLTCG: "",
+  hsaContribution: "",
+  hsaCoverageType: "self-only",
+  traditional401kContribution: "",
+  traditionalIraContribution: "",
 };
 
 type Step = "input" | "results";
@@ -29,22 +39,27 @@ export default function Home() {
   const [step, setStep] = useState<Step>("input");
 
   const result = useMemo(() => {
-    const grossIncome = Number(values.grossIncome) || 0;
-    const itemizedDeduction =
-      values.useItemized && values.itemizedDeduction
-        ? Number(values.itemizedDeduction) || 0
-        : undefined;
-
     return estimateTax({
-      grossIncome,
+      grossIncome: Number(values.grossIncome) || 0,
       filingStatus: values.filingStatus,
       state: values.state,
       taxYear: values.taxYear,
-      itemizedDeduction,
       selfEmploymentNetIncome: Number(values.selfEmploymentNetIncome) || 0,
       qualifyingChildren: Number(values.qualifyingChildren) || 0,
       otherDependents: Number(values.otherDependents) || 0,
       studentLoanInterestPaid: Number(values.studentLoanInterestPaid) || 0,
+      mortgageInterest: Number(values.mortgageInterest) || 0,
+      propertyTax: Number(values.propertyTax) || 0,
+      stateIncomeTaxPaid: Number(values.stateIncomeTaxPaid) || 0,
+      charitableDonations: Number(values.charitableDonations) || 0,
+      medicalExpenses: Number(values.medicalExpenses) || 0,
+      dependentCareExpenses: Number(values.dependentCareExpenses) || 0,
+      dependentCareQualifyingPersons: Number(values.dependentCareQualifyingPersons) || 0,
+      qualifiedDividendsAndLTCG: Number(values.qualifiedDividendsAndLTCG) || 0,
+      hsaContribution: Number(values.hsaContribution) || 0,
+      hsaCoverageType: values.hsaCoverageType,
+      traditional401kContribution: Number(values.traditional401kContribution) || 0,
+      traditionalIraContribution: Number(values.traditionalIraContribution) || 0,
     });
   }, [values]);
 

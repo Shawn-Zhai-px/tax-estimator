@@ -4,14 +4,15 @@ export default function DisclaimerBanner() {
       <p className="font-semibold">Estimate only — not tax advice.</p>
       <p className="mt-1">
         This tool provides a rough, unofficial estimate of federal and state
-        income tax based on standard deductions and published tax brackets.
-        It does not account for credits, itemized deductions (beyond a
-        simple override), payroll taxes, AMT, or your full financial
-        situation, and it may contain errors or outdated figures. It is not
-        prepared by a tax professional and does not file anything with the
-        IRS or any state agency. For an actual return or any decision with
-        real consequences, consult a licensed CPA / tax preparer or use IRS /
-        state-authorized filing software.
+        income tax based on published tax brackets, the deductions/credits
+        you enter, and your inputs elsewhere on this site. It does not
+        account for the EITC, education credits, AMT, QBI, payroll taxes on
+        W-2 wages, or your full financial situation, and it may contain
+        errors or outdated figures. It is not prepared by a tax professional
+        and does not file anything with the IRS or any state agency. For an
+        actual return or any decision with real consequences, consult a
+        licensed CPA / tax preparer or use IRS / state-authorized filing
+        software.
       </p>
       <p className="mt-1 text-amber-700">
         本工具仅提供联邦及州个人所得税的粗略估算，仅供参考，不构成税务建议，也不代为报税。请以

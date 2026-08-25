@@ -15,6 +15,14 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     { line: "1a", label: "Wages (from Form W-2, box 1)", value: result.grossIncome },
   ];
 
+  if (result.qualifiedDividendsAndLTCG > 0) {
+    rows.push({
+      line: "7",
+      label: "Capital gain (or loss)",
+      value: result.qualifiedDividendsAndLTCG,
+    });
+  }
+
   if (result.selfEmploymentNetIncome > 0) {
     rows.push({
       line: "8",
@@ -28,7 +36,7 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
   if (result.totalAdjustments > 0) {
     rows.push({
       line: "10",
-      label: "Adjustments to income (½ SE tax + student loan interest)",
+      label: "Adjustments to income (½ SE tax, student loan interest, HSA/401(k)/IRA)",
       value: result.totalAdjustments,
     });
   }
@@ -52,13 +60,25 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     });
   }
 
+  if (result.dependentCareCreditAmount > 0) {
+    rows.push({
+      line: "20",
+      label: `Schedule 3: dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}`,
+      value: result.dependentCareCreditAmount,
+    });
+  }
+
   rows.push({ line: "22", label: "Subtotal after credits", value: result.federalTax });
 
-  if (result.selfEmploymentTax > 0) {
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+    const parts = [
+      result.selfEmploymentTax > 0 ? "self-employment tax" : null,
+      result.netInvestmentIncomeTax > 0 ? "Net Investment Income Tax" : null,
+    ].filter(Boolean);
     rows.push({
       line: "23",
-      label: "Other taxes (Schedule 2: self-employment tax)",
-      value: result.selfEmploymentTax,
+      label: `Other taxes (Schedule 2: ${parts.join(" + ")})`,
+      value: result.selfEmploymentTax + result.netInvestmentIncomeTax,
     });
   }
 
@@ -87,9 +107,9 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        Reference only — assumes no other income, no itemized-deduction
-        breakdown, no other credits (EITC, education, etc.), no AMT/NIIT, and
-        no withholding/estimated payments. See the disclaimer above.
+        Reference only — assumes no other income, no other credits (EITC,
+        education, etc.), no QBI deduction, no AMT, and no withholding/
+        estimated payments. See the disclaimer above.
       </p>
     </div>
   );

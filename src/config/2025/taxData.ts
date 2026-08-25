@@ -134,4 +134,61 @@ export const TAX_DATA_2025: YearTaxData = {
     singleHoh: { lower: 85_000, upper: 100_000 },
     mfj: { lower: 170_000, upper: 200_000 },
   },
+  // IRC §164(b)(7), as amended by OBBBA: 2025 SALT itemized-deduction cap
+  // is $40,000 ($20,000 MFS), phased down 30% of the amount MAGI exceeds
+  // $500,000 ($250,000 MFS), floored at $10,000 ($5,000 MFS).
+  saltCap: 40_000,
+  saltCapMfs: 20_000,
+  saltPhaseDownThreshold: 500_000,
+  saltPhaseDownThresholdMfs: 250_000,
+  saltFloor: 10_000,
+  saltFloorMfs: 5_000,
+  // Form 2441 / IRC §21: 2025 Child and Dependent Care Credit. Expense caps
+  // $3,000 (one qualifying person) / $6,000 (two or more). Rate is 35% at
+  // AGI <= $15,000, stepping down 1 point per $2,000 (or fraction) of AGI
+  // above that, floored at 20% (reached once AGI exceeds $43,000) — same
+  // dollar thresholds for every filing status (this credit, unlike CTC,
+  // has never doubled its AGI thresholds for MFJ).
+  dependentCareCredit: {
+    expenseCapOnePerson: 3000,
+    expenseCapTwoOrMorePersons: 6000,
+    maxRatePercent: 35,
+    floorRatePercent: 20,
+    isRateApproximate: false,
+    stepDownStartAgi: 15_000,
+  },
+  // IRS Rev. Proc. 2024-40: 2025 long-term capital gains / qualified
+  // dividends preferential-rate brackets. MFS's 0% threshold matches
+  // Single's, but its 15%/20% threshold ($300,000) is its own figure, not
+  // simply half of MFJ's ($600,050).
+  capitalGainsBrackets: {
+    single: [
+      { min: 0, max: 48_350, rate: 0 },
+      { min: 48_350, max: 533_400, rate: 0.15 },
+      { min: 533_400, max: null, rate: 0.2 },
+    ],
+    mfj: [
+      { min: 0, max: 96_700, rate: 0 },
+      { min: 96_700, max: 600_050, rate: 0.15 },
+      { min: 600_050, max: null, rate: 0.2 },
+    ],
+    hoh: [
+      { min: 0, max: 64_750, rate: 0 },
+      { min: 64_750, max: 566_700, rate: 0.15 },
+      { min: 566_700, max: null, rate: 0.2 },
+    ],
+    mfs: [
+      { min: 0, max: 48_350, rate: 0 },
+      { min: 48_350, max: 300_000, rate: 0.15 },
+      { min: 300_000, max: null, rate: 0.2 },
+    ],
+  },
+  // IRS Rev. Proc. 2024-39 (HSA) / IRS 401(k) & IRA limit announcements:
+  // 2025 HSA $4,300 self-only / $8,550 family; 401(k)/403(b) elective
+  // deferral $23,500; traditional IRA $7,000. Age-50+/55+ catch-up amounts
+  // are not modeled.
+  hsaLimitSelfOnly: 4_300,
+  hsaLimitFamily: 8_550,
+  traditional401kLimit: 23_500,
+  traditionalIraLimit: 7_000,
 };

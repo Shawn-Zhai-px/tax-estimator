@@ -67,6 +67,59 @@ export interface YearTaxData {
     singleHoh: { lower: number; upper: number };
     mfj: { lower: number; upper: number };
   };
+
+  /** Federal SALT (state/local tax) itemized-deduction cap, before phase-down. */
+  saltCap: number;
+  saltCapMfs: number;
+  /** SALT cap phases down 30% of MAGI over this threshold (floored at saltFloor). */
+  saltPhaseDownThreshold: number;
+  saltPhaseDownThresholdMfs: number;
+  saltFloor: number;
+  saltFloorMfs: number;
+
+  /** Child and Dependent Care Credit (Form 2441 / IRC §21) parameters. */
+  dependentCareCredit: {
+    /** Expense cap when claiming for one qualifying person. */
+    expenseCapOnePerson: number;
+    /** Expense cap when claiming for two or more qualifying persons. */
+    expenseCapTwoOrMorePersons: number;
+    maxRatePercent: number;
+    floorRatePercent: number;
+    /** True if this year's rate schedule is a best-effort approximation (see calculateDependentCareCreditRate). */
+    isRateApproximate: boolean;
+    /**
+     * 2018-TCJA-style stepped schedule: rate steps down 1 point per $2,000
+     * (or fraction) of AGI over this amount, floored at floorRatePercent.
+     * Same dollar amount for every filing status. Mutually exclusive with
+     * `agiBreakpoints` — only one of the two is set per year.
+     */
+    stepDownStartAgi?: number;
+    /**
+     * OBBBA-style smooth approximation: four AGI breakpoints
+     * [maxRateEndsAt, midPlateauStarts, midPlateauEnds, floorStartsAt].
+     * Rate is maxRatePercent up to the first breakpoint, linearly
+     * interpolates down to midRatePercent by the second, holds flat until
+     * the third, then linearly interpolates down to floorRatePercent by
+     * the fourth. MFJ gets its own (roughly doubled) breakpoints.
+     */
+    agiBreakpoints?: {
+      other: [number, number, number, number];
+      mfj: [number, number, number, number];
+    };
+    /** Only meaningful alongside `agiBreakpoints` — the flat mid-plateau rate. */
+    midRatePercent?: number;
+  };
+
+  /** Long-term capital gains / qualified dividends preferential-rate brackets (0%/15%/20%). */
+  capitalGainsBrackets: Record<FilingStatus, TaxBracket[]>;
+
+  /** HSA annual contribution limits (excludes the $1,000 age-55+ catch-up, not modeled). */
+  hsaLimitSelfOnly: number;
+  hsaLimitFamily: number;
+  /** Traditional (pre-tax) 401(k)/403(b) elective deferral limit (excludes age-50+ catch-up, not modeled). */
+  traditional401kLimit: number;
+  /** Traditional IRA contribution limit (excludes age-50+ catch-up, not modeled; active-participant deduction phase-out also not modeled). */
+  traditionalIraLimit: number;
 }
 
 export const SUPPORTED_TAX_YEARS = [2025, 2026] as const;

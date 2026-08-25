@@ -16,13 +16,31 @@ export default function Form540Summary({ result }: { result: TaxEstimateResult }
   const rows: { line: string; label: string; value: number }[] = [
     { line: "12", label: "State wages (from Form W-2, box 16)", value: result.grossIncome },
     { line: "13", label: "Federal adjusted gross income (AGI)", value: result.federalAGI },
-    { line: "18", label: "CA standard deduction", value: result.caDeductionUsed },
+  ];
+
+  if (result.hsaDeduction > 0) {
+    rows.push(
+      {
+        line: "16",
+        label: "California adjustments: addition (HSA deduction not allowed by CA)",
+        value: result.hsaDeduction,
+      },
+      { line: "17", label: "California adjusted gross income", value: result.caAGI }
+    );
+  }
+
+  rows.push(
+    {
+      line: "18",
+      label: `CA ${result.caDeductionType === "itemized" ? "itemized" : "standard"} deduction`,
+      value: result.caDeductionUsed,
+    },
     { line: "19", label: "CA taxable income", value: result.stateTaxableIncome },
     { line: "31", label: "Tax (before credits)", value: taxBeforeCredits },
     { line: "48", label: "Tax after credits (no credits modeled)", value: taxBeforeCredits },
     { line: "62", label: "Behavioral Health Services Tax (formerly Mental Health Services Tax)", value: result.caMentalHealthTax },
-    { line: "64", label: "Total tax", value: result.stateTax },
-  ];
+    { line: "64", label: "Total tax", value: result.stateTax }
+  );
 
   return (
     <div className="mt-3">

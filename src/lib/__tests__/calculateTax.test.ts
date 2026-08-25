@@ -345,6 +345,315 @@ console.log("\n== Phase A: student loan interest deduction ==");
   check("2026 MFJ student loan phase-out uses 2026 range", result.studentLoanInterestDeduction, 1250);
 }
 
+console.log("\n== Phase B: SALT deduction (cap + phase-down) ==");
+{
+  // Well under the phase-down threshold: SALT simply capped at $40,000.
+  const result = estimateTax({
+    grossIncome: 200_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    propertyTax: 30_000,
+    stateIncomeTaxPaid: 25_000,
+  });
+  check("SALT capped at $40,000 (2025, no phase-down)", result.saltDeductible, 40_000);
+  check("federal itemized total equals capped SALT", result.federalItemizedTotal, 40_000);
+  check("federal itemizes when SALT exceeds standard deduction", result.deductionUsed, 40_000);
+  if (result.deductionType === "itemized") {
+    passed++;
+    console.log("  PASS  deductionType is itemized");
+  } else {
+    failed++;
+    console.error(`  FAIL  deductionType should be itemized, got ${result.deductionType}`);
+  }
+}
+
+{
+  // $100,000 over the $500,000 2025 phase-down threshold -> cap reduced by
+  // 30% of the excess ($30,000), landing at the $10,000 floor.
+  const result = estimateTax({
+    grossIncome: 600_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    propertyTax: 50_000,
+  });
+  check("SALT cap phased down to the $10,000 floor", result.saltDeductible, 10_000);
+}
+
+{
+  // 2026 uses the indexed $40,400 cap / $505,000 threshold.
+  const result = estimateTax({
+    grossIncome: 200_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    propertyTax: 50_000,
+  });
+  check("2026 SALT cap is $40,400", result.saltDeductible, 40_400);
+}
+
+console.log("\n== Phase B: medical expense deduction ==");
+{
+  // Only the amount over 7.5% of AGI is deductible.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    medicalExpenses: 20_000,
+  });
+  check("medical deduction excludes 7.5% of AGI", result.medicalDeductible, 20_000 - 0.075 * 100_000);
+}
+
+console.log("\n== Phase B: CA itemizes independently of federal ==");
+{
+  // $10,000 property tax: below the federal standard deduction ($15,750
+  // single 2025) so federal still uses standard, but above CA's much
+  // smaller standard deduction ($5,706) so CA itemizes with the same
+  // input — proving the two jurisdictions' decisions are decoupled.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "CA",
+    taxYear: 2025,
+    propertyTax: 10_000,
+  });
+  check("federal itemized total", result.federalItemizedTotal, 10_000);
+  if (result.deductionType === "standard") {
+    passed++;
+    console.log("  PASS  federal still uses the standard deduction");
+  } else {
+    failed++;
+    console.error(`  FAIL  federal should use standard, got ${result.deductionType}`);
+  }
+  check("CA itemized total (property tax, uncapped)", result.caItemizedTotal, 10_000);
+  if (result.caDeductionType === "itemized") {
+    passed++;
+    console.log("  PASS  CA itemizes independently");
+  } else {
+    failed++;
+    console.error(`  FAIL  CA should itemize, got ${result.caDeductionType}`);
+  }
+  check("CA deduction used", result.caDeductionUsed, 10_000);
+}
+
+console.log("\n== Phase B: Dependent Care Credit ==");
+{
+  // 2025 stepped rate: AGI $20,000 is $5,000 over the $15,000 start,
+  // ceil(5000/2000)=3 steps -> 35-3=32%. Two qualifying persons -> $6,000
+  // cap (expenses under the cap, so the full $5,000 counts).
+  const result = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    dependentCareExpenses: 5000,
+    dependentCareQualifyingPersons: 2,
+  });
+  check("2025 dependent care credit, stepped rate", result.dependentCareCreditAmount, 5000 * 0.32);
+  if (!result.dependentCareCreditIsApproximate) {
+    passed++;
+    console.log("  PASS  2025 rate is not flagged approximate");
+  } else {
+    failed++;
+    console.error("  FAIL  2025 rate should not be flagged approximate");
+  }
+}
+
+{
+  // One qualifying person caps expenses at $3,000 even though $5,000 was
+  // paid; AGI $10,000 <= $15,000 -> max 35% rate.
+  const result = estimateTax({
+    grossIncome: 10_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    dependentCareExpenses: 5000,
+    dependentCareQualifyingPersons: 1,
+  });
+  check("dependent care credit caps expenses at $3,000 (one person)", result.dependentCareCreditAmount, 3000 * 0.35);
+}
+
+{
+  // 2026: AGI <= $15,000 -> the new 50% max rate (up from 35% in 2025).
+  const result = estimateTax({
+    grossIncome: 10_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    dependentCareExpenses: 3000,
+    dependentCareQualifyingPersons: 1,
+  });
+  check("2026 dependent care credit uses the 50% OBBBA rate", result.dependentCareCreditAmount, 3000 * 0.5);
+  if (result.dependentCareCreditIsApproximate) {
+    passed++;
+    console.log("  PASS  2026 rate is flagged approximate");
+  } else {
+    failed++;
+    console.error("  FAIL  2026 rate should be flagged approximate");
+  }
+}
+
+{
+  // 2026 mid-plateau: AGI $60,000 falls in the flat 35% band ($43k-$75k).
+  const result = estimateTax({
+    grossIncome: 60_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    dependentCareExpenses: 3000,
+    dependentCareQualifyingPersons: 1,
+  });
+  check("2026 dependent care credit mid-plateau (35%)", result.dependentCareCreditAmount, 3000 * 0.35);
+}
+
+{
+  // 2026 floor: AGI well above $103,000 -> 20% floor rate.
+  const result = estimateTax({
+    grossIncome: 150_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    dependentCareExpenses: 3000,
+    dependentCareQualifyingPersons: 1,
+  });
+  check("2026 dependent care credit floor (20%)", result.dependentCareCreditAmount, 3000 * 0.2);
+}
+
+{
+  // 2026 linear interpolation: AGI $29,000 is halfway between $15,000 and
+  // $43,000 -> rate halfway between 50% and 35% = 42.5%.
+  const result = estimateTax({
+    grossIncome: 29_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    dependentCareExpenses: 3000,
+    dependentCareQualifyingPersons: 1,
+  });
+  check("2026 dependent care credit interpolated rate (42.5%)", result.dependentCareCreditAmount, 3000 * 0.425);
+}
+
+console.log("\n== Phase C: capital gains / qualified dividends preferential rates ==");
+{
+  // All taxable income (including the LTCG) sits within the 2025 single
+  // 0% bracket ($0-$48,350) -> zero capital gains tax.
+  const result = estimateTax({
+    grossIncome: 0,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 40_000,
+  });
+  check("LTCG fully within the 0% bracket", result.capitalGainsTax, 0);
+  check("federal tax is $0 (all in 0% bracket)", result.federalTaxBeforeCredits, 0);
+}
+
+{
+  // $60,000 ordinary wages + $20,000 LTCG, single, 2025: ordinary taxable
+  // income is $44,250 (< the $48,350 0%/15% breakpoint); the $20,000 LTCG
+  // stacks on top, straddling the breakpoint — $4,100 at 0%, $15,900 at 15%.
+  const result = estimateTax({
+    grossIncome: 60_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 20_000,
+  });
+  const expectedOrdinaryTax = 11_925 * 0.1 + (44_250 - 11_925) * 0.12;
+  const expectedCapGainsTax = (64_250 - 48_350) * 0.15;
+  check("ordinary + capital gains tax stacks correctly", result.federalTaxBeforeCredits, expectedOrdinaryTax + expectedCapGainsTax);
+  check("capital gains tax isolates the stacked slice", result.capitalGainsTax, expectedCapGainsTax);
+}
+
+console.log("\n== Phase C: Net Investment Income Tax ==");
+{
+  // $230,000 AGI, single (threshold $200,000): NIIT applies to the lesser
+  // of net investment income ($50,000) or the $30,000 MAGI excess.
+  const result = estimateTax({
+    grossIncome: 180_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 50_000,
+  });
+  check("NIIT capped by MAGI excess over threshold", result.netInvestmentIncomeTax, 0.038 * 30_000);
+}
+
+{
+  // MFS uses its own $125,000 threshold (half of MFJ's $250,000, not the
+  // $200,000 "other statuses" figure).
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "mfs",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 50_000,
+  });
+  check("NIIT uses the $125,000 MFS threshold", result.netInvestmentIncomeTax, 0.038 * 25_000);
+}
+
+console.log("\n== Phase C: HSA / traditional 401(k) / traditional IRA ==");
+{
+  // HSA capped at the 2025 self-only limit ($4,300) even though more was entered.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    hsaContribution: 6000,
+    hsaCoverageType: "self-only",
+  });
+  check("HSA deduction capped at 2025 self-only limit", result.hsaDeduction, 4300);
+}
+
+{
+  // 2026 family HSA limit is $8,750.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    hsaContribution: 9000,
+    hsaCoverageType: "family",
+  });
+  check("HSA deduction capped at 2026 family limit", result.hsaDeduction, 8750);
+}
+
+{
+  // California does not conform to the federal HSA deduction: CA AGI adds
+  // it back, so with only an HSA adjustment, CA AGI == total income.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "CA",
+    taxYear: 2025,
+    hsaContribution: 4300,
+    hsaCoverageType: "self-only",
+  });
+  check("federal AGI reduced by HSA", result.federalAGI, 95_700);
+  check("CA AGI adds the HSA deduction back", result.caAGI, 100_000);
+}
+
+{
+  // Traditional 401(k) and IRA contributions are capped at the 2025 limits
+  // ($23,500 / $7,000) and reduce AGI for both federal and CA.
+  const result = estimateTax({
+    grossIncome: 100_000,
+    filingStatus: "single",
+    state: "CA",
+    taxYear: 2025,
+    traditional401kContribution: 30_000,
+    traditionalIraContribution: 10_000,
+  });
+  check("401(k) deduction capped at 2025 limit", result.traditional401kDeduction, 23_500);
+  check("IRA deduction capped at 2025 limit", result.traditionalIraDeduction, 7000);
+  const expectedAgi = 100_000 - 23_500 - 7000;
+  check("federal AGI reflects both deductions", result.federalAGI, expectedAgi);
+  check("CA AGI also reflects both deductions (CA conforms)", result.caAGI, expectedAgi);
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   process.exit(1);

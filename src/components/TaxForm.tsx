@@ -14,17 +14,63 @@ export interface TaxFormValues {
   grossIncome: string;
   filingStatus: FilingStatus;
   state: StateCode;
-  useItemized: boolean;
-  itemizedDeduction: string;
   selfEmploymentNetIncome: string;
   qualifyingChildren: string;
   otherDependents: string;
   studentLoanInterestPaid: string;
+  mortgageInterest: string;
+  propertyTax: string;
+  stateIncomeTaxPaid: string;
+  charitableDonations: string;
+  medicalExpenses: string;
+  dependentCareExpenses: string;
+  dependentCareQualifyingPersons: string;
+  qualifiedDividendsAndLTCG: string;
+  hsaContribution: string;
+  hsaCoverageType: "self-only" | "family";
+  traditional401kContribution: string;
+  traditionalIraContribution: string;
 }
 
 interface TaxFormProps {
   values: TaxFormValues;
   onChange: (values: TaxFormValues) => void;
+}
+
+function DollarInput({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+        {label}
+      </label>
+      <div className="relative mt-1">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+          $
+        </span>
+        <input
+          id={id}
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step={100}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="0"
+          className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function TaxForm({ values, onChange }: TaxFormProps) {
@@ -113,37 +159,88 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         </p>
       </div>
 
-      <div className="border-t border-slate-100 pt-4">
-        <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-          <input
-            type="checkbox"
-            checked={values.useItemized}
-            onChange={(e) => update("useItemized", e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">Itemized deductions (optional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Enter what you actually paid — we automatically compare the total
+            against the standard deduction and use whichever is larger, for
+            federal <strong>and separately for California</strong> (CA has no
+            SALT cap and doesn&apos;t allow deducting state income tax on its
+            own return).
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="mortgageInterest"
+            label="Mortgage interest"
+            value={values.mortgageInterest}
+            onChange={(v) => update("mortgageInterest", v)}
           />
-          Use itemized federal deduction instead of standard deduction
-        </label>
-        {values.useItemized && (
-          <div className="relative mt-2">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
-              $
-            </span>
+          <DollarInput
+            id="propertyTax"
+            label="Property tax"
+            value={values.propertyTax}
+            onChange={(v) => update("propertyTax", v)}
+          />
+          <DollarInput
+            id="stateIncomeTaxPaid"
+            label="State income tax paid"
+            value={values.stateIncomeTaxPaid}
+            onChange={(v) => update("stateIncomeTaxPaid", v)}
+          />
+          <DollarInput
+            id="charitableDonations"
+            label="Charitable donations"
+            value={values.charitableDonations}
+            onChange={(v) => update("charitableDonations", v)}
+          />
+        </div>
+        <DollarInput
+          id="medicalExpenses"
+          label="Medical expenses (total, before the 7.5%-of-AGI threshold)"
+          value={values.medicalExpenses}
+          onChange={(v) => update("medicalExpenses", v)}
+        />
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">Dependent care credit (optional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Capped at $3,000 (one qualifying person) / $6,000 (two or more),
+            at a rate up to 35% (2025) or up to 50% (2026 — an OBBBA
+            increase; the 2026 rate schedule is an approximation pending
+            final IRS guidance) depending on AGI. If you already use a
+            Dependent Care FSA on the paycheck withholding calculator,
+            subtract that amount here — the same expense can&apos;t get both
+            FSA tax savings and this credit.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="dependentCareExpenses"
+            label="Dependent care expenses paid"
+            value={values.dependentCareExpenses}
+            onChange={(v) => update("dependentCareExpenses", v)}
+          />
+          <div>
+            <label htmlFor="dependentCareQualifyingPersons" className="block text-sm font-medium text-slate-700">
+              Qualifying persons
+            </label>
             <input
+              id="dependentCareQualifyingPersons"
               type="number"
+              inputMode="numeric"
               min={0}
-              step={100}
-              value={values.itemizedDeduction}
-              onChange={(e) => update("itemizedDeduction", e.target.value)}
-              placeholder="Total itemized deductions"
-              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              step={1}
+              value={values.dependentCareQualifyingPersons}
+              onChange={(e) => update("dependentCareQualifyingPersons", e.target.value)}
+              placeholder="0"
+              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
             />
           </div>
-        )}
-        <p className="mt-1 text-xs text-slate-500">
-          If left unchecked, the calculator automatically uses the larger of
-          your entry and the standard deduction. California always uses its
-          own standard deduction in this MVP.
-        </p>
+        </div>
       </div>
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
@@ -242,6 +339,74 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
             Capped at $2,500 and phased out at higher incomes. Not available
             if your filing status is Married Filing Separately.
           </p>
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">Investment income (optional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Long-term capital gains and qualified dividends are taxed at
+            preferential 0%/15%/20% federal rates (stacked on top of your
+            ordinary income) instead of ordinary brackets, and may trigger
+            the 3.8% Net Investment Income Tax. California has no
+            preferential rate — it taxes this the same as ordinary income.
+          </p>
+        </div>
+        <DollarInput
+          id="qualifiedDividendsAndLTCG"
+          label="Long-term capital gains + qualified dividends"
+          value={values.qualifiedDividendsAndLTCG}
+          onChange={(v) => update("qualifiedDividendsAndLTCG", v)}
+        />
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">Retirement &amp; HSA contributions (optional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Traditional (pre-tax) contributions reduce your taxable income,
+            capped at the annual IRS limit (age 50+/55+ catch-up amounts
+            aren&apos;t modeled). <strong>California doesn&apos;t recognize
+            HSAs</strong> — the HSA deduction reduces federal tax only, not
+            CA.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="traditional401kContribution"
+            label="Traditional 401(k)/403(b)"
+            value={values.traditional401kContribution}
+            onChange={(v) => update("traditional401kContribution", v)}
+          />
+          <DollarInput
+            id="traditionalIraContribution"
+            label="Traditional IRA"
+            value={values.traditionalIraContribution}
+            onChange={(v) => update("traditionalIraContribution", v)}
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="hsaContribution"
+            label="HSA contribution"
+            value={values.hsaContribution}
+            onChange={(v) => update("hsaContribution", v)}
+          />
+          <div>
+            <label htmlFor="hsaCoverageType" className="block text-sm font-medium text-slate-700">
+              HDHP coverage
+            </label>
+            <select
+              id="hsaCoverageType"
+              value={values.hsaCoverageType}
+              onChange={(e) => update("hsaCoverageType", e.target.value as "self-only" | "family")}
+              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="self-only">Self-only</option>
+              <option value="family">Family</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
