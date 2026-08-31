@@ -122,6 +122,35 @@ export interface YearTaxData {
   /** Long-term capital gains / qualified dividends preferential-rate brackets (0%/15%/20%). */
   capitalGainsBrackets: Record<FilingStatus, TaxBracket[]>;
 
+  /**
+   * Qualified Business Income deduction (Section 199A). Single/HoH/MFS share
+   * the same thresholds ("all other filing statuses" per IRS); MFJ has its
+   * own (roughly double) thresholds. CA does not conform — federal only.
+   */
+  qbi: {
+    /** Below this taxable income, the full 20% deduction applies with no W-2/UBIA limitation (SSTBs are also treated as fully qualified). */
+    thresholdLower: Record<FilingStatus, number>;
+    /** Above this taxable income, the W-2/UBIA limitation applies in full for non-SSTBs, and SSTBs get $0. Linearly phased in between thresholdLower and thresholdUpper. */
+    thresholdUpper: Record<FilingStatus, number>;
+    /** OBBBA minimum deduction when QBI >= $1,000 and the taxpayer materially participates (0 for years before this provision took effect). */
+    minimumDeduction: number;
+  };
+
+  /**
+   * Alternative Minimum Tax (Form 6251), simplified — federal only (see
+   * calculateAmt in calculateTax.ts for the adjustments/preference items
+   * this tool models and the ones it doesn't).
+   */
+  amt: {
+    exemption: Record<FilingStatus, number>;
+    /** Exemption phases out above this AMTI. */
+    phaseOutThreshold: Record<FilingStatus, number>;
+    /** Fraction of AMTI over phaseOutThreshold that reduces the exemption (0.25 pre-OBBBA, 0.50 from 2026). */
+    phaseOutRate: number;
+    /** Below this AMT tax base (post-exemption, ordinary portion), the rate is 26%; above it, 28%. */
+    rate28Breakpoint: Record<FilingStatus, number>;
+  };
+
   /** HSA annual contribution limits (excludes the $1,000 age-55+ catch-up, not modeled). */
   hsaLimitSelfOnly: number;
   hsaLimitFamily: number;

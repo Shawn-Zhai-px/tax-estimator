@@ -159,6 +159,28 @@ export const TAX_DATA_2026: YearTaxData = {
       { min: 306_850, max: null, rate: 0.2 },
     ],
   },
+  // IRC §199A / IRS Rev. Proc. 2025-32, as amended by OBBBA: 2026 QBI
+  // thresholds. OBBBA expanded the phase-in range width (Single/HoH/MFS:
+  // $50,000 -> $75,000; MFJ: $100,000 -> $150,000), so thresholdUpper
+  // isn't a simple continuation of the 2025 spread. OBBBA also introduces
+  // a new $400 minimum deduction (when QBI >= $1,000 and the taxpayer
+  // materially participates) starting this year.
+  qbi: {
+    thresholdLower: { single: 201_750, hoh: 201_750, mfs: 201_750, mfj: 403_500 },
+    thresholdUpper: { single: 276_750, hoh: 276_750, mfs: 276_750, mfj: 553_500 },
+    minimumDeduction: 400,
+  },
+  // Form 6251, as amended by OBBBA: 2026 AMT exemption rises slightly, but
+  // OBBBA drops the phase-out thresholds back to their pre-2018 levels and
+  // doubles the phase-out rate (25% -> 50%) — the net effect is that AMT
+  // triggers considerably more easily for high earners than under 2025's
+  // rules, despite the higher exemption amount.
+  amt: {
+    exemption: { single: 90_100, hoh: 90_100, mfs: 70_100, mfj: 140_200 },
+    phaseOutThreshold: { single: 500_000, hoh: 500_000, mfs: 500_000, mfj: 1_000_000 },
+    phaseOutRate: 0.5,
+    rate28Breakpoint: { single: 244_500, hoh: 244_500, mfs: 122_250, mfj: 244_500 },
+  },
   // IRS 2026 HSA/401(k)/IRA limit announcements: HSA $4,400 self-only /
   // $8,750 family; 401(k)/403(b) elective deferral $24,500 (same figure
   // independently used in ../../lib/paycheckData.ts's

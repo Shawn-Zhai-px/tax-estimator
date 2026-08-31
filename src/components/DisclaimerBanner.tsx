@@ -6,9 +6,12 @@ export default function DisclaimerBanner() {
         This tool provides a rough, unofficial estimate of federal and state
         income tax based on published tax brackets, the deductions/credits
         you enter, and your inputs elsewhere on this site. It does not
-        account for the EITC, education credits, AMT, QBI, payroll taxes on
-        W-2 wages, or your full financial situation, and it may contain
-        errors or outdated figures. It is not prepared by a tax professional
+        account for the EITC, education credits, payroll taxes on W-2 wages,
+        or your full financial situation, and it may contain errors or
+        outdated figures. Its QBI and AMT calculations are simplified (a
+        single business only, no multi-business aggregation for QBI; no
+        disqualifying ISO dispositions, AMT NOL carryforward, AMT foreign tax
+        credit, or California's separate AMT). It is not prepared by a tax professional
         and does not file anything with the IRS or any state agency. For an
         actual return or any decision with real consequences, consult a
         licensed CPA / tax preparer or use IRS / state-authorized filing

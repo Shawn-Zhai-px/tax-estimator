@@ -42,6 +42,16 @@ export interface TaxEstimateInput {
   traditional401kContribution?: number;
   /** Optional: traditional (deductible) IRA contribution. */
   traditionalIraContribution?: number;
+  /** Optional: is the self-employment income entered above from a Specified Service Trade or Business (SSTB, e.g. law/medicine/consulting/finance) for QBI purposes? Defaults to false. Only matters once taxable income is inside/above the QBI phase-in range. */
+  isSpecifiedServiceTradeOrBusiness?: boolean;
+  /** Optional: W-2 wages paid BY the business itself (not the user's own wages) — used for the QBI W-2/UBIA limitation. Most solo freelancers with no employees leave this at 0. */
+  qualifiedBusinessW2Wages?: number;
+  /** Optional: unadjusted basis immediately after acquisition (UBIA) of the business's qualified property — used for the QBI W-2/UBIA limitation. */
+  qualifiedBusinessUbia?: number;
+  /** Optional: ISO (incentive stock option) exercise spread (fair market value at exercise minus exercise price) for options exercised and held — an AMT preference item. */
+  isoExerciseSpread?: number;
+  /** Optional: private activity bond interest — federally tax-exempt but an AMT preference item. */
+  privateActivityBondInterest?: number;
 }
 
 export interface BracketBreakdownRow {
@@ -124,6 +134,15 @@ export interface TaxEstimateResult {
 
   deductionUsed: number;
   deductionType: "standard" | "itemized";
+  isSpecifiedServiceTradeOrBusiness: boolean;
+  qualifiedBusinessW2Wages: number;
+  qualifiedBusinessUbia: number;
+  /**
+   * Section 199A Qualified Business Income deduction — federal only (CA
+   * doesn't conform). Simplified to a single business (no multi-business
+   * aggregation) — see docs/phase-d-amt-qbi-plan.md.
+   */
+  qbiDeduction: number;
   federalTaxableIncome: number;
   /** Federal income tax from the bracket table, before the dependent credit (1040 line 16). */
   federalTaxBeforeCredits: number;
@@ -132,7 +151,16 @@ export interface TaxEstimateResult {
   federalMarginalRate: number;
   federalEffectiveRate: number;
   federalBracketBreakdown: BracketBreakdownRow[];
-  /** Federal income tax (incl. capital gains tax) + self-employment tax + NIIT (the federal "total tax" line). */
+  isoExerciseSpread: number;
+  privateActivityBondInterest: number;
+  /**
+   * Alternative Minimum Tax owed (simplified — see calculateAmt in this
+   * file and docs/phase-d-amt-qbi-plan.md for what's modeled and what
+   * isn't). 0 when the regular tax already exceeds the tentative minimum
+   * tax. Federal only — CA's separate 7% AMT isn't modeled.
+   */
+  amtAmount: number;
+  /** Federal income tax (incl. capital gains tax and AMT) + self-employment tax + NIIT (the federal "total tax" line). */
   federalTotalTax: number;
 
   stateTaxableIncome: number;
@@ -329,6 +357,113 @@ function calculateNiit(netInvestmentIncome: number, magi: number, filingStatus: 
 }
 
 /**
+ * Section 199A Qualified Business Income deduction, simplified to a single
+ * business (no multi-business aggregation/netting) — see
+ * docs/phase-d-amt-qbi-plan.md. Below `thresholdLower`, the full 20%
+ * applies with no limitation. Above `thresholdUpper`, non-SSTBs are
+ * limited to the greater of 50% of W-2 wages or 25% of W-2 wages + 2.5% of
+ * UBIA, and SSTBs get $0. In between, both figures phase in linearly (for
+ * SSTBs this is approximated as a straight-line reduction of the 20%
+ * deduction itself, rather than separately phasing the wage/UBIA inputs
+ * per the exact Form 8995-A worksheet).
+ */
+function calculateQbiDeduction(
+  qualifiedBusinessIncome: number,
+  isSstb: boolean,
+  w2Wages: number,
+  ubia: number,
+  taxableIncomeBeforeQbi: number,
+  netCapitalGain: number,
+  filingStatus: FilingStatus,
+  yearData: ReturnType<typeof getTaxDataForYear>
+): number {
+  const qbi = clampToZero(qualifiedBusinessIncome);
+  if (qbi <= 0) {
+    return 0;
+  }
+
+  const tentativeDeduction = 0.2 * qbi;
+  const wageUbiaLimit = Math.max(0.5 * clampToZero(w2Wages), 0.25 * clampToZero(w2Wages) + 0.025 * clampToZero(ubia));
+  const { thresholdLower, thresholdUpper, minimumDeduction } = yearData.qbi;
+  const lower = thresholdLower[filingStatus];
+  const upper = thresholdUpper[filingStatus];
+
+  let deduction: number;
+  if (taxableIncomeBeforeQbi <= lower) {
+    deduction = tentativeDeduction;
+  } else if (taxableIncomeBeforeQbi >= upper) {
+    deduction = isSstb ? 0 : Math.min(tentativeDeduction, wageUbiaLimit);
+  } else {
+    const phaseInFraction = (taxableIncomeBeforeQbi - lower) / (upper - lower);
+    deduction = isSstb
+      ? tentativeDeduction * (1 - phaseInFraction)
+      : tentativeDeduction - phaseInFraction * clampToZero(tentativeDeduction - wageUbiaLimit);
+  }
+
+  // Overall income cap: never more than 20% of (taxable income before QBI,
+  // minus any net capital gain, which is taxed at its own preferential
+  // rate and isn't eligible for the QBI deduction).
+  const incomeCap = 0.2 * clampToZero(taxableIncomeBeforeQbi - clampToZero(netCapitalGain));
+  deduction = Math.min(deduction, incomeCap);
+
+  // OBBBA minimum deduction (2026+): at least $400 once QBI >= $1,000.
+  if (qbi >= 1000 && minimumDeduction > 0) {
+    deduction = Math.max(deduction, minimumDeduction);
+  }
+
+  return clampToZero(deduction);
+}
+
+/**
+ * Alternative Minimum Tax (Form 6251), simplified — see
+ * docs/phase-d-amt-qbi-plan.md for exactly what's modeled (SALT/standard-
+ * deduction add-back, ISO exercise spread, private activity bond interest)
+ * and what isn't (disqualifying ISO dispositions, AMT NOL carryforward,
+ * AMT foreign tax credit, CA's separate 7% AMT). Capital gains/qualified
+ * dividends keep their preferential rates inside AMTI, same as regular tax.
+ * Returns the AMT owed on top of the regular tax (0 if regular tax already
+ * exceeds the tentative minimum tax), comparing against tax BEFORE credits
+ * to sidestep AMT's more intricate credit-ordering rules.
+ */
+function calculateAmt(
+  federalTaxableIncome: number,
+  deductionUsed: number,
+  isoExerciseSpread: number,
+  privateActivityBondInterest: number,
+  qualifiedDividendsAndLTCG: number,
+  federalTaxBeforeCredits: number,
+  filingStatus: FilingStatus,
+  yearData: ReturnType<typeof getTaxDataForYear>
+): number {
+  // Standard and itemized deductions are both disallowed for AMT. Rather
+  // than isolating just the SALT component of an itemized deduction, this
+  // adds back the whole `deductionUsed` in either case — simpler, and more
+  // conservative (never understates AMTI).
+  const amti = clampToZero(
+    federalTaxableIncome + deductionUsed + clampToZero(isoExerciseSpread) + clampToZero(privateActivityBondInterest)
+  );
+
+  const { exemption, phaseOutThreshold, phaseOutRate, rate28Breakpoint } = yearData.amt;
+  const exemptionReduction = clampToZero(amti - phaseOutThreshold[filingStatus]) * phaseOutRate;
+  const availableExemption = clampToZero(exemption[filingStatus] - exemptionReduction);
+
+  const amtBase = clampToZero(amti - availableExemption);
+  const capGainsInAmtBase = clampToZero(Math.min(qualifiedDividendsAndLTCG, amtBase));
+  const ordinaryAmtBase = amtBase - capGainsInAmtBase;
+
+  const breakpoint = rate28Breakpoint[filingStatus];
+  const ordinaryAmtTax = Math.min(ordinaryAmtBase, breakpoint) * 0.26 + clampToZero(ordinaryAmtBase - breakpoint) * 0.28;
+
+  const capitalGainsBrackets = yearData.capitalGainsBrackets[filingStatus];
+  const capGainsAmtTax =
+    totalBracketTax(ordinaryAmtBase + capGainsInAmtBase, capitalGainsBrackets) -
+    totalBracketTax(ordinaryAmtBase, capitalGainsBrackets);
+
+  const tentativeMinimumTax = ordinaryAmtTax + capGainsAmtTax;
+  return clampToZero(tentativeMinimumTax - federalTaxBeforeCredits);
+}
+
+/**
  * Apply a progressive bracket table to a taxable-income amount.
  * Returns total tax, the marginal rate that applied to the last dollar,
  * and a row-by-row breakdown for transparency in the UI/export.
@@ -459,7 +594,30 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
   const deductionType: "standard" | "itemized" =
     federalItemizedTotal > standardDeduction ? "itemized" : "standard";
 
-  const federalTaxableIncome = clampToZero(federalAGI - deductionUsed);
+  const taxableIncomeBeforeQbi = clampToZero(federalAGI - deductionUsed);
+
+  // --- QBI (Section 199A) deduction — federal only, reduces taxable income
+  // one more step below the standard/itemized deduction. Reuses
+  // `selfEmploymentNetIncome` as the qualified business income base,
+  // reduced by the deductible half of self-employment tax (the one
+  // technical QBI adjustment this tool models; SE health insurance and
+  // retirement contributions aren't modeled as further QBI reductions).
+  const isSpecifiedServiceTradeOrBusiness = input.isSpecifiedServiceTradeOrBusiness ?? false;
+  const qualifiedBusinessW2Wages = clampToZero(input.qualifiedBusinessW2Wages ?? 0);
+  const qualifiedBusinessUbia = clampToZero(input.qualifiedBusinessUbia ?? 0);
+  const qualifiedBusinessIncome = clampToZero(selfEmploymentNetIncome - selfEmploymentTaxDeduction);
+  const qbiDeduction = calculateQbiDeduction(
+    qualifiedBusinessIncome,
+    isSpecifiedServiceTradeOrBusiness,
+    qualifiedBusinessW2Wages,
+    qualifiedBusinessUbia,
+    taxableIncomeBeforeQbi,
+    qualifiedDividendsAndLTCG,
+    filingStatus,
+    yearData
+  );
+
+  const federalTaxableIncome = clampToZero(taxableIncomeBeforeQbi - qbiDeduction);
   const federalBrackets = yearData.federalBrackets[filingStatus];
 
   // Long-term capital gains / qualified dividends are taxed at preferential
@@ -502,7 +660,22 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
 
   const federalTax = clampToZero(federalTaxBeforeCredits - dependentCreditAmount - dependentCareCreditAmount);
   const netInvestmentIncomeTax = calculateNiit(qualifiedDividendsAndLTCG, federalAGI, filingStatus);
-  const federalTotalTax = federalTax + selfEmploymentTax + netInvestmentIncomeTax;
+
+  // --- Alternative Minimum Tax (federal only, simplified) ---
+  const isoExerciseSpread = clampToZero(input.isoExerciseSpread ?? 0);
+  const privateActivityBondInterest = clampToZero(input.privateActivityBondInterest ?? 0);
+  const amtAmount = calculateAmt(
+    federalTaxableIncome,
+    deductionUsed,
+    isoExerciseSpread,
+    privateActivityBondInterest,
+    qualifiedDividendsAndLTCG,
+    federalTaxBeforeCredits,
+    filingStatus,
+    yearData
+  );
+
+  const federalTotalTax = federalTax + amtAmount + selfEmploymentTax + netInvestmentIncomeTax;
 
   // --- State ---
   let stateTaxableIncome = 0;
@@ -595,12 +768,19 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     dependentCareCreditIsApproximate: yearData.dependentCareCredit.isRateApproximate,
     deductionUsed,
     deductionType,
+    isSpecifiedServiceTradeOrBusiness,
+    qualifiedBusinessW2Wages,
+    qualifiedBusinessUbia,
+    qbiDeduction,
     federalTaxableIncome,
     federalTaxBeforeCredits,
     federalTax,
     federalMarginalRate: ordinaryResult.marginalRate,
     federalEffectiveRate: totalIncome > 0 ? federalTax / totalIncome : 0,
     federalBracketBreakdown: ordinaryResult.breakdown,
+    isoExerciseSpread,
+    privateActivityBondInterest,
+    amtAmount,
     federalTotalTax,
     stateTaxableIncome,
     stateTax: totalStateTax,

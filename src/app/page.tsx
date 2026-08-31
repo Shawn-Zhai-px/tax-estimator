@@ -15,6 +15,9 @@ const DEFAULT_VALUES: TaxFormValues = {
   filingStatus: "single",
   state: "CA",
   selfEmploymentNetIncome: "",
+  isSpecifiedServiceTradeOrBusiness: false,
+  qualifiedBusinessW2Wages: "",
+  qualifiedBusinessUbia: "",
   qualifyingChildren: "",
   otherDependents: "",
   studentLoanInterestPaid: "",
@@ -30,6 +33,8 @@ const DEFAULT_VALUES: TaxFormValues = {
   hsaCoverageType: "self-only",
   traditional401kContribution: "",
   traditionalIraContribution: "",
+  isoExerciseSpread: "",
+  privateActivityBondInterest: "",
 };
 
 type Step = "input" | "results";
@@ -45,6 +50,9 @@ export default function Home() {
       state: values.state,
       taxYear: values.taxYear,
       selfEmploymentNetIncome: Number(values.selfEmploymentNetIncome) || 0,
+      isSpecifiedServiceTradeOrBusiness: values.isSpecifiedServiceTradeOrBusiness,
+      qualifiedBusinessW2Wages: Number(values.qualifiedBusinessW2Wages) || 0,
+      qualifiedBusinessUbia: Number(values.qualifiedBusinessUbia) || 0,
       qualifyingChildren: Number(values.qualifyingChildren) || 0,
       otherDependents: Number(values.otherDependents) || 0,
       studentLoanInterestPaid: Number(values.studentLoanInterestPaid) || 0,
@@ -60,6 +68,8 @@ export default function Home() {
       hsaCoverageType: values.hsaCoverageType,
       traditional401kContribution: Number(values.traditional401kContribution) || 0,
       traditionalIraContribution: Number(values.traditionalIraContribution) || 0,
+      isoExerciseSpread: Number(values.isoExerciseSpread) || 0,
+      privateActivityBondInterest: Number(values.privateActivityBondInterest) || 0,
     });
   }, [values]);
 

@@ -47,10 +47,29 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
       line: "12",
       label: `${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction`,
       value: result.deductionUsed,
-    },
+    }
+  );
+
+  if (result.qbiDeduction > 0) {
+    rows.push({
+      line: "13",
+      label: "Qualified business income deduction",
+      value: result.qbiDeduction,
+    });
+  }
+
+  rows.push(
     { line: "15", label: "Taxable income", value: result.federalTaxableIncome },
     { line: "16", label: "Tax", value: result.federalTaxBeforeCredits }
   );
+
+  if (result.amtAmount > 0) {
+    rows.push({
+      line: "17",
+      label: "Schedule 2: Alternative Minimum Tax (simplified)",
+      value: result.amtAmount,
+    });
+  }
 
   if (result.dependentCreditAmount > 0) {
     rows.push({
@@ -68,7 +87,11 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     });
   }
 
-  rows.push({ line: "22", label: "Subtotal after credits", value: result.federalTax });
+  rows.push({
+    line: "22",
+    label: "Subtotal after credits",
+    value: result.federalTax + result.amtAmount,
+  });
 
   if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
     const parts = [
@@ -108,8 +131,9 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
       </div>
       <p className="mt-2 text-xs text-slate-500">
         Reference only — assumes no other income, no other credits (EITC,
-        education, etc.), no QBI deduction, no AMT, and no withholding/
-        estimated payments. See the disclaimer above.
+        education, etc.), and no withholding/estimated payments. QBI and AMT
+        above use simplified calculations (see the notes in the form and any
+        amber notice above). See the disclaimer above.
       </p>
     </div>
   );

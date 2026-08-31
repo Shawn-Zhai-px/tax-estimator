@@ -205,7 +205,14 @@ console.log("\n== Phase A: self-employment tax ==");
   const expectedAGI = 100_000 - expectedSeTax / 2;
   check("federal AGI after SE tax deduction", result.federalAGI, expectedAGI);
 
-  const expectedTaxable = expectedAGI - 15750;
+  const expectedTaxableBeforeQbi = expectedAGI - 15750;
+  // QBI deduction (Phase D): 20% of qualified business income (net of the
+  // SE-tax deduction), capped at 20% of taxable income before QBI — the
+  // income cap binds here since taxable income is well under the business
+  // income itself.
+  const qbiBase = 100_000 - expectedSeTax / 2;
+  const expectedQbiDeduction = Math.min(0.2 * qbiBase, 0.2 * expectedTaxableBeforeQbi);
+  const expectedTaxable = expectedTaxableBeforeQbi - expectedQbiDeduction;
   const expectedFederalTax =
     11925 * 0.1 + 36550 * 0.12 + (expectedTaxable - 48475) * 0.22;
   check("federal tax on SE income", result.federalTax, expectedFederalTax);
@@ -652,6 +659,214 @@ console.log("\n== Phase C: HSA / traditional 401(k) / traditional IRA ==");
   const expectedAgi = 100_000 - 23_500 - 7000;
   check("federal AGI reflects both deductions", result.federalAGI, expectedAgi);
   check("CA AGI also reflects both deductions (CA conforms)", result.caAGI, expectedAgi);
+}
+
+console.log("\n== Phase D: QBI deduction ==");
+{
+  // Below the phase-in threshold: full 20% of QBI (net of the SE-tax
+  // deduction adjustment), well under the 20%-of-taxable-income cap.
+  const result = estimateTax({
+    grossIncome: 80_000,
+    selfEmploymentNetIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  const seNetEarnings = 20_000 * 0.9235;
+  const seTax = seNetEarnings * 0.124 + seNetEarnings * 0.029; // well under the SS wage base, so uncapped
+  const qbiBase = 20_000 - seTax / 2;
+  check("QBI deduction below threshold: full 20%", result.qbiDeduction, 0.2 * qbiBase);
+}
+
+{
+  // SSTB, taxable income above the upper threshold (single, 2025:
+  // $247,300) -> deduction is $0.
+  const result = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 400_000,
+    isSpecifiedServiceTradeOrBusiness: true,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("QBI deduction: SSTB above upper threshold is $0", result.qbiDeduction, 0);
+}
+
+{
+  // Non-SSTB, taxable income above the upper threshold -> limited to the
+  // greater of 50% of W-2 wages or 25% of wages + 2.5% of UBIA (UBIA left
+  // at 0 here, so the wage-based half of the formula binds).
+  const result = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 400_000,
+    qualifiedBusinessW2Wages: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("QBI deduction: non-SSTB wage-limited above upper threshold", result.qbiDeduction, 50_000);
+}
+
+{
+  // Non-SSTB, taxable income exactly halfway through the phase-in range
+  // (single, 2025: $197,300-$247,300) -> deduction is halfway between the
+  // unlimited 20% and the wage-limited amount.
+  const seIncome = 50_000;
+  const w2Wages = 10_000;
+  const seNetEarnings = seIncome * 0.9235;
+  const seTax = seNetEarnings * 0.029; // grossIncome below is set high enough to zero out the SS portion
+  const seTaxDeduction = seTax / 2;
+  const standardDeduction = DATA_2025.federalStandardDeduction.single;
+  const lower = DATA_2025.qbi.thresholdLower.single;
+  const upper = DATA_2025.qbi.thresholdUpper.single;
+  const midpoint = lower + (upper - lower) / 2;
+  const grossIncome = midpoint - seIncome + seTaxDeduction + standardDeduction;
+
+  const result = estimateTax({
+    grossIncome,
+    selfEmploymentNetIncome: seIncome,
+    qualifiedBusinessW2Wages: w2Wages,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+
+  const qbiBase = seIncome - seTaxDeduction;
+  const tentativeDeduction = 0.2 * qbiBase;
+  const wageLimit = 0.5 * w2Wages;
+  const expected = tentativeDeduction - 0.5 * Math.max(0, tentativeDeduction - wageLimit);
+  check("QBI deduction: halfway through the phase-in range", result.qbiDeduction, expected);
+}
+
+{
+  // OBBBA minimum deduction ($400, 2026+): a tiny QBI amount that the
+  // regular formula would reduce to $0 (taxable income fully absorbed by
+  // the standard deduction) still gets at least $400 once QBI >= $1,000.
+  const result2026 = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 1500,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+  });
+  check("QBI minimum deduction applies in 2026", result2026.qbiDeduction, 400);
+
+  const result2025 = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 1500,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("QBI minimum deduction does not apply in 2025 (pre-OBBBA)", result2025.qbiDeduction, 0);
+}
+
+console.log("\n== Phase D: Alternative Minimum Tax ==");
+{
+  // Modest income, no preference items -> the exemption comfortably covers
+  // AMTI and regular tax dominates. Confirms adding AMT doesn't disturb
+  // ordinary scenarios (backward compatible).
+  const result = estimateTax({
+    grossIncome: 75_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("AMT does not trigger for a modest-income W-2 filer", result.amtAmount, 0);
+}
+
+{
+  // A large ISO exercise spread (an AMT preference item with no equivalent
+  // in regular taxable income) pushes AMTI well above the exemption,
+  // triggering AMT even though regular income alone wouldn't.
+  const isoSpread = 300_000;
+  const result = estimateTax({
+    grossIncome: 150_000,
+    isoExerciseSpread: isoSpread,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  const amti = result.federalTaxableIncome + result.deductionUsed + isoSpread;
+  const availableExemption = Math.max(
+    0,
+    DATA_2025.amt.exemption.single - Math.max(0, amti - DATA_2025.amt.phaseOutThreshold.single) * DATA_2025.amt.phaseOutRate
+  );
+  const amtBase = Math.max(0, amti - availableExemption);
+  const breakpoint = DATA_2025.amt.rate28Breakpoint.single;
+  const tmt = Math.min(amtBase, breakpoint) * 0.26 + Math.max(0, amtBase - breakpoint) * 0.28;
+  check("AMT triggers from a large ISO exercise spread", result.amtAmount, tmt - result.federalTaxBeforeCredits);
+  if (result.amtAmount > 0) {
+    passed++;
+    console.log("  PASS  AMT amount is positive");
+  } else {
+    failed++;
+    console.error("  FAIL  AMT amount should be positive");
+  }
+}
+
+{
+  // AMTI above the phase-out threshold (single, 2025: $626,350) reduces
+  // the available exemption — exercises the phase-out math specifically.
+  const isoSpread = 500_000;
+  const result = estimateTax({
+    grossIncome: 300_000,
+    isoExerciseSpread: isoSpread,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  const amti = result.federalTaxableIncome + result.deductionUsed + isoSpread;
+  if (amti > DATA_2025.amt.phaseOutThreshold.single) {
+    passed++;
+    console.log("  PASS  AMTI clears the phase-out threshold");
+  } else {
+    failed++;
+    console.error("  FAIL  AMTI should clear the phase-out threshold");
+  }
+  const availableExemption = Math.max(
+    0,
+    DATA_2025.amt.exemption.single - (amti - DATA_2025.amt.phaseOutThreshold.single) * DATA_2025.amt.phaseOutRate
+  );
+  const amtBase = Math.max(0, amti - availableExemption);
+  const breakpoint = DATA_2025.amt.rate28Breakpoint.single;
+  const tmt = Math.min(amtBase, breakpoint) * 0.26 + Math.max(0, amtBase - breakpoint) * 0.28;
+  check("AMT amount with exemption phase-out", result.amtAmount, tmt - result.federalTaxBeforeCredits);
+}
+
+{
+  // Same inputs compared across years: OBBBA lowers the 2026 phase-out
+  // threshold ($626,350 -> $500,000) and doubles the phase-out rate
+  // (25% -> 50%), so an AMTI that clears the 2026 threshold but not
+  // 2025's owes more AMT in 2026 despite 2026's slightly higher exemption.
+  const isoSpread = 350_000;
+  const shared = {
+    grossIncome: 200_000,
+    isoExerciseSpread: isoSpread,
+    filingStatus: "single" as const,
+    state: "TX" as const,
+  };
+  const result2025 = estimateTax({ ...shared, taxYear: 2025 });
+  const result2026 = estimateTax({ ...shared, taxYear: 2026 });
+
+  // AMTI = federalAGI - qbiDeduction + iso + privateActivityBondInterest,
+  // independent of deductionUsed (it's added back and then subtracted out
+  // again) — so with no QBI here, it's the same in both years.
+  const amti = 200_000 + isoSpread;
+  if (amti > DATA_2026.amt.phaseOutThreshold.single && amti < DATA_2025.amt.phaseOutThreshold.single) {
+    passed++;
+    console.log("  PASS  AMTI clears the 2026 OBBBA threshold but not 2025's");
+  } else {
+    failed++;
+    console.error("  FAIL  AMTI should clear the 2026 OBBBA threshold but not 2025's");
+  }
+  if (result2026.amtAmount > result2025.amtAmount) {
+    passed++;
+    console.log(`  PASS  2026 OBBBA rules produce more AMT (${result2026.amtAmount.toFixed(2)} > ${result2025.amtAmount.toFixed(2)})`);
+  } else {
+    failed++;
+    console.error(`  FAIL  2026 AMT (${result2026.amtAmount.toFixed(2)}) should exceed 2025 AMT (${result2025.amtAmount.toFixed(2)})`);
+  }
 }
 
 console.log(`\n${passed} passed, ${failed} failed`);

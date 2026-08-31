@@ -29,6 +29,11 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   if (result.selfEmploymentNetIncome > 0) {
     line(`Self-employment net income: ${formatCurrency(result.selfEmploymentNetIncome)}`);
   }
+  if (result.isoExerciseSpread > 0 || result.privateActivityBondInterest > 0) {
+    line(
+      `AMT preference items: ISO exercise spread ${formatCurrency(result.isoExerciseSpread)}, private activity bond interest ${formatCurrency(result.privateActivityBondInterest)}`
+    );
+  }
   if (result.qualifyingChildren > 0 || result.otherDependents > 0) {
     line(`Dependents: ${result.qualifyingChildren} qualifying child(ren), ${result.otherDependents} other`);
   }
@@ -56,6 +61,9 @@ export function exportResultToPdf(result: TaxEstimateResult) {
     line(`Total income: ${formatCurrency(result.totalIncome)}`);
     line(`Federal AGI (after adjustments): ${formatCurrency(result.federalAGI)}`);
   }
+  if (result.qbiDeduction > 0) {
+    line(`  less QBI (Section 199A) deduction: ${formatCurrency(result.qbiDeduction)}`);
+  }
   line(`Federal taxable income: ${formatCurrency(result.federalTaxableIncome)}`);
   if (result.capitalGainsTax > 0) {
     line(`  incl. capital gains tax (0%/15%/20%): ${formatCurrency(result.capitalGainsTax)}`);
@@ -69,12 +77,15 @@ export function exportResultToPdf(result: TaxEstimateResult) {
     );
   }
   line(`Federal income tax: ${formatCurrency(result.federalTax)}  (marginal rate ${formatPercent(result.federalMarginalRate)})`);
-  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0 || result.amtAmount > 0) {
     if (result.selfEmploymentTax > 0) {
       line(`  plus self-employment tax: ${formatCurrency(result.selfEmploymentTax)}`);
     }
     if (result.netInvestmentIncomeTax > 0) {
       line(`  plus Net Investment Income Tax (3.8%): ${formatCurrency(result.netInvestmentIncomeTax)}`);
+    }
+    if (result.amtAmount > 0) {
+      line(`  plus Alternative Minimum Tax (simplified): ${formatCurrency(result.amtAmount)}`);
     }
     line(`Federal total tax: ${formatCurrency(result.federalTotalTax)}`, 11, true);
   }
@@ -136,8 +147,14 @@ export function exportResultToPdf(result: TaxEstimateResult) {
     `12  ${result.deductionType === "itemized" ? "Itemized" : "Standard"} deduction: ${formatCurrency(result.deductionUsed)}`,
     9.5
   );
+  if (result.qbiDeduction > 0) {
+    line(`13  Qualified business income deduction: ${formatCurrency(result.qbiDeduction)}`, 9.5);
+  }
   line(`15  Taxable income: ${formatCurrency(result.federalTaxableIncome)}`, 9.5);
   line(`16  Tax: ${formatCurrency(result.federalTaxBeforeCredits)}`, 9.5);
+  if (result.amtAmount > 0) {
+    line(`17  Schedule 2: Alternative Minimum Tax (simplified): ${formatCurrency(result.amtAmount)}`, 9.5);
+  }
   if (result.dependentCreditAmount > 0) {
     line(`19  Child tax credit / credit for other dependents: ${formatCurrency(result.dependentCreditAmount)}`, 9.5);
   }
@@ -147,7 +164,7 @@ export function exportResultToPdf(result: TaxEstimateResult) {
       9.5
     );
   }
-  line(`22  Subtotal after credits: ${formatCurrency(result.federalTax)}`, 9.5);
+  line(`22  Subtotal after credits: ${formatCurrency(result.federalTax + result.amtAmount)}`, 9.5);
   if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
     const otherTaxParts = [
       result.selfEmploymentTax > 0 ? "self-employment tax" : null,
@@ -192,7 +209,9 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   const disclaimerText = doc.splitTextToSize(
     "Disclaimer: This is an unofficial, simplified estimate. Deduction/credit amounts (mortgage interest, SALT, medical, dependent " +
       "care, retirement/HSA contributions, capital gains, NIIT, etc.) are computed from what you entered, not verified against any " +
-      "documents. Excludes EITC, education credits, AMT, QBI, and payroll taxes on W-2 wages. It is not prepared by a tax " +
+      "documents. Excludes EITC, education credits, and payroll taxes on W-2 wages. QBI and AMT (when they apply) use simplified " +
+      "calculations — QBI assumes a single business with no multi-business aggregation; AMT doesn't model disqualifying ISO " +
+      "dispositions, AMT NOL carryforward, AMT foreign tax credit, or California's separate 7% AMT. It is not prepared by a tax " +
       "professional and is not a substitute for filing software or a licensed CPA / tax preparer. Verify all figures against current IRS and state guidance before relying on them.",
     500
   );

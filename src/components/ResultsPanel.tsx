@@ -47,6 +47,16 @@ export default function ResultsPanel({
           will change once the FTB releases the real {result.taxYear} schedule.
         </div>
       )}
+      {result.amtAmount > 0 && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+          This estimate includes Alternative Minimum Tax, computed with a
+          simplified Form 6251: it adds back your full standard/itemized
+          deduction and any ISO exercise spread or private activity bond
+          interest you entered, but doesn't model disqualifying ISO
+          dispositions, AMT NOL carryforward, or AMT foreign tax credit.
+          California's separate 7% AMT isn't modeled.
+        </div>
+      )}
       {result.dependentCareCreditIsApproximate && result.dependentCareCreditAmount > 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           The {result.taxYear} Dependent Care Credit rate below is an
@@ -63,6 +73,7 @@ export default function ResultsPanel({
             const parts = [
               result.selfEmploymentTax > 0 ? `${formatCurrency(result.selfEmploymentTax)} SE tax` : null,
               result.netInvestmentIncomeTax > 0 ? `${formatCurrency(result.netInvestmentIncomeTax)} NIIT` : null,
+              result.amtAmount > 0 ? `${formatCurrency(result.amtAmount)} AMT` : null,
             ].filter(Boolean);
             return parts.length > 0 ? `incl. ${parts.join(" + ")}` : undefined;
           })()}
@@ -154,6 +165,12 @@ export default function ResultsPanel({
             </dt>
             <dd className="font-medium">{formatCurrency(result.deductionUsed)}</dd>
           </div>
+          {result.qbiDeduction > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">QBI (Section 199A) deduction</dt>
+              <dd className="font-medium">−{formatCurrency(result.qbiDeduction)}</dd>
+            </div>
+          )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">
             <dt className="text-slate-500">Federal taxable income</dt>
             <dd className="font-medium">{formatCurrency(result.federalTaxableIncome)}</dd>
@@ -168,6 +185,12 @@ export default function ResultsPanel({
             <div className="flex justify-between border-b border-slate-100 py-1.5">
               <dt className="text-slate-500">Net Investment Income Tax (3.8%)</dt>
               <dd className="font-medium">{formatCurrency(result.netInvestmentIncomeTax)}</dd>
+            </div>
+          )}
+          {result.amtAmount > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Alternative Minimum Tax (simplified)</dt>
+              <dd className="font-medium">{formatCurrency(result.amtAmount)}</dd>
             </div>
           )}
           {result.dependentCreditAmount > 0 && (

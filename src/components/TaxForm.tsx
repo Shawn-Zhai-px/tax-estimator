@@ -15,6 +15,9 @@ export interface TaxFormValues {
   filingStatus: FilingStatus;
   state: StateCode;
   selfEmploymentNetIncome: string;
+  isSpecifiedServiceTradeOrBusiness: boolean;
+  qualifiedBusinessW2Wages: string;
+  qualifiedBusinessUbia: string;
   qualifyingChildren: string;
   otherDependents: string;
   studentLoanInterestPaid: string;
@@ -30,6 +33,8 @@ export interface TaxFormValues {
   hsaCoverageType: "self-only" | "family";
   traditional401kContribution: string;
   traditionalIraContribution: string;
+  isoExerciseSpread: string;
+  privateActivityBondInterest: string;
 }
 
 interface TaxFormProps {
@@ -258,7 +263,47 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
           <p className="mt-1 text-xs text-slate-500">
             Net profit from self-employment/1099/gig work (Schedule C), before
             self-employment tax. We&apos;ll compute self-employment tax and its
-            deductible half automatically.
+            deductible half automatically, and also use it as your Qualified
+            Business Income for the QBI deduction below.
+          </p>
+        </div>
+
+        <div className="space-y-2 rounded-md border border-slate-100 bg-slate-50 p-3">
+          <p className="text-xs font-medium text-slate-600">
+            QBI (Section 199A) deduction — only matters if self-employment
+            net income is entered above
+          </p>
+          <label htmlFor="isSpecifiedServiceTradeOrBusiness" className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              id="isSpecifiedServiceTradeOrBusiness"
+              type="checkbox"
+              checked={values.isSpecifiedServiceTradeOrBusiness}
+              onChange={(e) => update("isSpecifiedServiceTradeOrBusiness", e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            />
+            This is a Specified Service Trade or Business (SSTB — e.g. law,
+            medicine, consulting, financial/investment services)
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <DollarInput
+              id="qualifiedBusinessW2Wages"
+              label="W-2 wages paid by the business"
+              value={values.qualifiedBusinessW2Wages}
+              onChange={(v) => update("qualifiedBusinessW2Wages", v)}
+            />
+            <DollarInput
+              id="qualifiedBusinessUbia"
+              label="Business property basis (UBIA)"
+              value={values.qualifiedBusinessUbia}
+              onChange={(v) => update("qualifiedBusinessUbia", v)}
+            />
+          </div>
+          <p className="text-xs text-slate-500">
+            These two only limit the deduction once taxable income is high
+            enough to enter the QBI phase-in range — most solo freelancers
+            with no employees and no business property leave both at $0.
+            Simplified to a single business (no multi-business aggregation);
+            SSTB phase-in is approximated as a straight-line reduction.
           </p>
         </div>
 
@@ -381,6 +426,48 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
               <option value="self-only">Self-only</option>
               <option value="family">Family</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">
+            Alternative Minimum Tax (AMT) preference items (optional)
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            We automatically check whether you owe AMT based on your other
+            inputs (mainly your SALT deduction, if any). These two items are
+            only relevant if they apply to you — most filers leave both at
+            $0. Simplified: doesn&apos;t model disqualifying ISO
+            dispositions, AMT NOL carryforward, or AMT foreign tax credit;
+            California&apos;s separate 7% AMT isn&apos;t modeled.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <DollarInput
+              id="isoExerciseSpread"
+              label="ISO exercise spread"
+              value={values.isoExerciseSpread}
+              onChange={(v) => update("isoExerciseSpread", v)}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Fair market value minus exercise price, for incentive stock
+              options exercised and still held (not sold) this year.
+            </p>
+          </div>
+          <div>
+            <DollarInput
+              id="privateActivityBondInterest"
+              label="Private activity bond interest"
+              value={values.privateActivityBondInterest}
+              onChange={(v) => update("privateActivityBondInterest", v)}
+            />
+            <p className="mt-1 text-xs text-slate-500">
+              Interest from private activity municipal bonds — federally
+              tax-exempt, but not for AMT purposes.
+            </p>
           </div>
         </div>
       </div>

@@ -184,6 +184,26 @@ export const TAX_DATA_2025: YearTaxData = {
       { min: 300_000, max: null, rate: 0.2 },
     ],
   },
+  // IRC §199A / IRS Rev. Proc. 2024-40: 2025 QBI deduction taxable-income
+  // thresholds. Single/HoH/MFS share the "all other filing statuses" figures
+  // ($197,300-$247,300); MFJ gets its own ($394,600-$494,600). OBBBA made
+  // the QBI deduction permanent, but its new $400 minimum deduction doesn't
+  // take effect until 2026.
+  qbi: {
+    thresholdLower: { single: 197_300, hoh: 197_300, mfs: 197_300, mfj: 394_600 },
+    thresholdUpper: { single: 247_300, hoh: 247_300, mfs: 247_300, mfj: 494_600 },
+    minimumDeduction: 0,
+  },
+  // Form 6251: 2025 AMT exemption, phase-out threshold/rate, and the
+  // 26%/28% rate breakpoint (pre-OBBBA phase-out rules still apply for
+  // 2025 — 25% phase-out rate, higher phase-out thresholds; OBBBA's much
+  // lower thresholds and doubled phase-out rate take effect in 2026).
+  amt: {
+    exemption: { single: 88_100, hoh: 88_100, mfs: 68_500, mfj: 137_000 },
+    phaseOutThreshold: { single: 626_350, hoh: 626_350, mfs: 626_350, mfj: 1_252_700 },
+    phaseOutRate: 0.25,
+    rate28Breakpoint: { single: 239_100, hoh: 239_100, mfs: 119_550, mfj: 239_100 },
+  },
   // IRS Rev. Proc. 2024-39 (HSA) / IRS 401(k) & IRA limit announcements:
   // 2025 HSA $4,300 self-only / $8,550 family; 401(k)/403(b) elective
   // deferral $23,500; traditional IRA $7,000. Age-50+/55+ catch-up amounts
