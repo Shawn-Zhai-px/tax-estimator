@@ -112,7 +112,11 @@ export default function PrivacyPage() {
             This is an independent, non-commercial estimator. If something here seems inconsistent
             with how the tools actually behave, please treat this page — and not marketing copy —
             as the source of truth, and feel free to verify any claim yourself by inspecting the
-            page&apos;s network requests in your browser&apos;s developer tools.
+            page&apos;s network requests in your browser&apos;s developer tools. See also the{" "}
+            <Link href="/terms" className="text-brand-600 hover:underline">
+              Terms of Use
+            </Link>
+            .
           </p>
         </Section>
       </div>

@@ -90,6 +90,10 @@ function TabbedHome() {
           Privacy policy
         </Link>
         <span className="mx-2">·</span>
+        <Link href="/terms" className="inline-block py-2 hover:text-slate-600 hover:underline">
+          Terms of use
+        </Link>
+        <span className="mx-2">·</span>
         Nothing you enter is sent to a server — everything above is computed in your browser.
       </footer>
     </main>

@@ -9,6 +9,7 @@ import {
   TaxYear,
 } from "@/config";
 import { EducationCreditType, TaxEstimateInput } from "@/lib/calculateTax";
+import { getNegativeInputWarning } from "@/lib/format";
 
 export interface TaxFormValues {
   taxYear: TaxYear;
@@ -135,6 +136,8 @@ function DollarInput({
   onChange: (v: string) => void;
   step?: number;
 }) {
+  const warning = getNegativeInputWarning(value);
+  const warningId = `${id}-warning`;
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-slate-700">
@@ -153,9 +156,64 @@ function DollarInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="0"
-          className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          aria-invalid={warning ? true : undefined}
+          aria-describedby={warning ? warningId : undefined}
+          className={`w-full rounded-md border py-2 pl-7 pr-3 text-sm focus:outline-none focus:ring-1 ${
+            warning
+              ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+              : "border-slate-300 focus:border-brand-500 focus:ring-brand-500"
+          }`}
         />
       </div>
+      {warning && (
+        <p id={warningId} className="mt-1 text-xs text-red-600">
+          {warning}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function IntegerInput({
+  id,
+  label,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const warning = getNegativeInputWarning(value);
+  const warningId = `${id}-warning`;
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-slate-700">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={0}
+        step={1}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0"
+        aria-invalid={warning ? true : undefined}
+        aria-describedby={warning ? warningId : undefined}
+        className={`mt-1 w-full rounded-md border py-2 px-3 text-sm focus:outline-none focus:ring-1 ${
+          warning
+            ? "border-red-400 focus:border-red-500 focus:ring-red-500"
+            : "border-slate-300 focus:border-brand-500 focus:ring-brand-500"
+        }`}
+      />
+      {warning && (
+        <p id={warningId} className="mt-1 text-xs text-red-600">
+          {warning}
+        </p>
+      )}
     </div>
   );
 }
@@ -296,22 +354,12 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
             value={values.dependentCareExpenses}
             onChange={(v) => update("dependentCareExpenses", v)}
           />
-          <div>
-            <label htmlFor="dependentCareQualifyingPersons" className="block text-sm font-medium text-slate-700">
-              Qualifying persons
-            </label>
-            <input
-              id="dependentCareQualifyingPersons"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={values.dependentCareQualifyingPersons}
-              onChange={(e) => update("dependentCareQualifyingPersons", e.target.value)}
-              placeholder="0"
-              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <IntegerInput
+            id="dependentCareQualifyingPersons"
+            label="Qualifying persons"
+            value={values.dependentCareQualifyingPersons}
+            onChange={(v) => update("dependentCareQualifyingPersons", v)}
+          />
         </div>
       </div>
 
@@ -321,25 +369,12 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         </p>
 
         <div>
-          <label htmlFor="selfEmploymentNetIncome" className="block text-sm font-medium text-slate-700">
-            Self-employment net income
-          </label>
-          <div className="relative mt-1">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
-              $
-            </span>
-            <input
-              id="selfEmploymentNetIncome"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={100}
-              value={values.selfEmploymentNetIncome}
-              onChange={(e) => update("selfEmploymentNetIncome", e.target.value)}
-              placeholder="0"
-              className="w-full rounded-md border border-slate-300 py-2 pl-7 pr-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <DollarInput
+            id="selfEmploymentNetIncome"
+            label="Self-employment net income"
+            value={values.selfEmploymentNetIncome}
+            onChange={(v) => update("selfEmploymentNetIncome", v)}
+          />
           <p className="mt-1 text-xs text-slate-500">
             Net profit from self-employment/1099/gig work (Schedule C), before
             self-employment tax. We&apos;ll compute self-employment tax and its
@@ -388,38 +423,18 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="qualifyingChildren" className="block text-sm font-medium text-slate-700">
-              Qualifying children (under 17)
-            </label>
-            <input
-              id="qualifyingChildren"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={values.qualifyingChildren}
-              onChange={(e) => update("qualifyingChildren", e.target.value)}
-              placeholder="0"
-              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="otherDependents" className="block text-sm font-medium text-slate-700">
-              Other dependents
-            </label>
-            <input
-              id="otherDependents"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              step={1}
-              value={values.otherDependents}
-              onChange={(e) => update("otherDependents", e.target.value)}
-              placeholder="0"
-              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-            />
-          </div>
+          <IntegerInput
+            id="qualifyingChildren"
+            label="Qualifying children (under 17)"
+            value={values.qualifyingChildren}
+            onChange={(v) => update("qualifyingChildren", v)}
+          />
+          <IntegerInput
+            id="otherDependents"
+            label="Other dependents"
+            value={values.otherDependents}
+            onChange={(v) => update("otherDependents", v)}
+          />
         </div>
         <p className="-mt-2 text-xs text-slate-500">
           Child Tax Credit ($2,200/child) and Credit for Other Dependents

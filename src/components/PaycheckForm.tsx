@@ -10,6 +10,7 @@ import {
   PAY_FREQUENCY_LABELS,
   PayFrequency,
 } from "@/lib/paycheckData";
+import { getNegativeInputWarning, getRateInputWarning } from "@/lib/format";
 
 export interface PaycheckFormValues {
   // Step 1 — Essential information
@@ -66,6 +67,8 @@ const helpClass = "mt-1 text-xs text-slate-500";
 const checkboxLabelClass = "flex items-center gap-2 text-sm font-medium text-slate-700";
 const checkboxClass = "h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500";
 
+const invalidInputClass = "border-red-400 focus:border-red-500 focus:ring-red-500";
+
 function DollarField({
   id,
   label,
@@ -79,6 +82,8 @@ function DollarField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const warning = getNegativeInputWarning(value);
+  const warningId = `${id}-warning`;
   return (
     <div>
       <label htmlFor={id} className={labelClass}>
@@ -92,12 +97,20 @@ function DollarField({
           id={id}
           type="number"
           inputMode="decimal"
+          min={0}
           step={100}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} pl-7`}
+          aria-invalid={warning ? true : undefined}
+          aria-describedby={warning ? warningId : undefined}
+          className={`${inputClass} pl-7 ${warning ? invalidInputClass : ""}`}
         />
       </div>
+      {warning && (
+        <p id={warningId} className="mt-1 text-xs text-red-600">
+          {warning}
+        </p>
+      )}
       {help && <p className={helpClass}>{help}</p>}
     </div>
   );
@@ -116,6 +129,8 @@ function RateField({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const warning = getRateInputWarning(value);
+  const warningId = `${id}-warning`;
   return (
     <div>
       <label htmlFor={id} className={labelClass}>
@@ -130,8 +145,15 @@ function RateField({
         step={0.01}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`${inputClass} mt-1`}
+        aria-invalid={warning ? true : undefined}
+        aria-describedby={warning ? warningId : undefined}
+        className={`${inputClass} mt-1 ${warning ? invalidInputClass : ""}`}
       />
+      {warning && (
+        <p id={warningId} className="mt-1 text-xs text-red-600">
+          {warning}
+        </p>
+      )}
       {help && <p className={helpClass}>{help}</p>}
     </div>
   );
