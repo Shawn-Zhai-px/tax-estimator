@@ -291,7 +291,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">Itemized deductions (optional)</p>
+          <h3 className="text-sm font-semibold text-slate-900">Itemized deductions (optional)</h3>
           <p className="mt-1 text-xs text-slate-500">
             Enter what you actually paid — we automatically compare the total
             against the standard deduction and use whichever is larger, for
@@ -336,7 +336,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">Dependent care credit (optional)</p>
+          <h3 className="text-sm font-semibold text-slate-900">Dependent care credit (optional)</h3>
           <p className="mt-1 text-xs text-slate-500">
             Capped at $3,000 (one qualifying person) / $6,000 (two or more),
             at a rate up to 35% (2025) or up to 50% (2026 — an OBBBA
@@ -364,9 +364,9 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
       </div>
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
-        <p className="text-sm font-medium text-slate-700">
+        <h3 className="text-sm font-semibold text-slate-900">
           Additional income &amp; deductions (optional)
-        </p>
+        </h3>
 
         <div>
           <DollarInput
@@ -464,7 +464,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">Investment income (optional)</p>
+          <h3 className="text-sm font-semibold text-slate-900">Investment income (optional)</h3>
           <p className="mt-1 text-xs text-slate-500">
             <strong>How long you held the asset changes the rate.</strong>{" "}
             Long-term gains (held more than one year) and qualified dividends
@@ -494,7 +494,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">Education credit (optional)</p>
+          <h3 className="text-sm font-semibold text-slate-900">Education credit (optional)</h3>
           <p className="mt-1 text-xs text-slate-500">
             Enter tuition and required fees you paid, then pick which credit
             you qualify for — you can&apos;t claim both for the same student
@@ -541,7 +541,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">Retirement &amp; HSA contributions (optional)</p>
+          <h3 className="text-sm font-semibold text-slate-900">Retirement &amp; HSA contributions (optional)</h3>
           <p className="mt-1 text-xs text-slate-500">
             Traditional (pre-tax) contributions reduce your taxable income,
             capped at the annual IRS limit (age 50+/55+ catch-up amounts
@@ -590,9 +590,9 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div className="space-y-4 border-t border-slate-100 pt-4">
         <div>
-          <p className="text-sm font-medium text-slate-700">
+          <h3 className="text-sm font-semibold text-slate-900">
             Alternative Minimum Tax (AMT) preference items (optional)
-          </p>
+          </h3>
           <p className="mt-1 text-xs text-slate-500">
             We automatically check whether you owe AMT based on your other
             inputs (mainly your SALT deduction, if any). These two items are
