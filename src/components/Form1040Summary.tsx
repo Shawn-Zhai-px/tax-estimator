@@ -15,11 +15,11 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     { line: "1a", label: "Wages (from Form W-2, box 1)", value: result.grossIncome },
   ];
 
-  if (result.qualifiedDividendsAndLTCG > 0) {
+  if (result.qualifiedDividendsAndLTCG > 0 || result.shortTermCapitalGains > 0) {
     rows.push({
       line: "7",
-      label: "Capital gain (or loss)",
-      value: result.qualifiedDividendsAndLTCG,
+      label: "Capital gain (or loss) (Schedule D: short-term + long-term)",
+      value: result.qualifiedDividendsAndLTCG + result.shortTermCapitalGains,
     });
   }
 
@@ -79,11 +79,19 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     });
   }
 
-  if (result.dependentCareCreditAmount > 0) {
+  if (result.dependentCareCreditAmount > 0 || result.educationCreditNonrefundable > 0) {
+    const schedule3Parts = [
+      result.dependentCareCreditAmount > 0
+        ? `dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}`
+        : null,
+      result.educationCreditNonrefundable > 0
+        ? `nonrefundable education credit (${result.educationCreditType === "aotc" ? "American Opportunity" : "Lifetime Learning"})`
+        : null,
+    ].filter(Boolean);
     rows.push({
       line: "20",
-      label: `Schedule 3: dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}`,
-      value: result.dependentCareCreditAmount,
+      label: `Schedule 3: ${schedule3Parts.join(" + ")}`,
+      value: result.dependentCareCreditAmount + result.educationCreditNonrefundable,
     });
   }
 
@@ -93,19 +101,57 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
     value: result.federalTax + result.amtAmount,
   });
 
-  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+  if (
+    result.selfEmploymentTax > 0 ||
+    result.netInvestmentIncomeTax > 0 ||
+    result.additionalMedicareTax > 0
+  ) {
     const parts = [
       result.selfEmploymentTax > 0 ? "self-employment tax" : null,
       result.netInvestmentIncomeTax > 0 ? "Net Investment Income Tax" : null,
+      result.additionalMedicareTax > 0 ? "Additional Medicare Tax (Form 8959)" : null,
     ].filter(Boolean);
     rows.push({
       line: "23",
       label: `Other taxes (Schedule 2: ${parts.join(" + ")})`,
-      value: result.selfEmploymentTax + result.netInvestmentIncomeTax,
+      value: result.selfEmploymentTax + result.netInvestmentIncomeTax + result.additionalMedicareTax,
     });
   }
 
-  rows.push({ line: "24", label: "Total tax", value: result.federalTotalTax });
+  rows.push({
+    line: "24",
+    label: "Total tax",
+    value: result.federalTotalTaxBeforeRefundableCredits,
+  });
+
+  // Refundable credits live in the 1040's Payments section rather than
+  // reducing line 24, so they appear below "total tax", not inside it.
+  if (result.earnedIncomeCredit > 0) {
+    rows.push({ line: "27", label: "Earned income credit (EIC)", value: result.earnedIncomeCredit });
+  }
+
+  if (result.educationCreditRefundable > 0) {
+    rows.push({
+      line: "29",
+      label: "American opportunity credit, refundable portion (Form 8863 line 8)",
+      value: result.educationCreditRefundable,
+    });
+  }
+
+  if (result.refundableCreditsTotal > 0) {
+    rows.push(
+      {
+        line: "33",
+        label: "Total payments (refundable credits only — no withholding modeled)",
+        value: result.refundableCreditsTotal,
+      },
+      {
+        line: "34/37",
+        label: "Amount owed, or refunded if negative (line 24 − line 33)",
+        value: result.federalTotalTax,
+      }
+    );
+  }
 
   return (
     <div className="mt-3">
@@ -130,10 +176,11 @@ export default function Form1040Summary({ result }: { result: TaxEstimateResult 
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-500">
-        Reference only — assumes no other income, no other credits (EITC,
-        education, etc.), and no withholding/estimated payments. QBI and AMT
-        above use simplified calculations (see the notes in the form and any
-        amber notice above). See the disclaimer above.
+        Reference only — assumes no other income, no credits beyond the ones
+        you entered inputs for, and no withholding or estimated payments. QBI,
+        AMT, the EITC, and the education credits above use simplified
+        calculations (see the notes in the form and any notice above). See the
+        disclaimer above.
       </p>
     </div>
   );

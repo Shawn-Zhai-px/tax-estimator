@@ -184,6 +184,40 @@ export const TAX_DATA_2025: YearTaxData = {
       { min: 300_000, max: null, rate: 0.2 },
     ],
   },
+  // IRC §32 / IRS Rev. Proc. 2024-40 §2.06, cross-checked against the IRS
+  // "Earned income and EITC tables" page: 2025 EITC. Maximum credits are
+  // $649 / $4,328 / $7,152 / $8,046 for 0 / 1 / 2 / 3-or-more qualifying
+  // children (each the statutory credit percentage applied to that year's
+  // earned income amount of $8,490 / $12,730 / $17,880 / $17,880). Phase-out
+  // begins at $10,620 (0 children) or $23,350 (1+) for Single/HoH, and
+  // $17,730 / $30,470 for MFJ. §32(i) disallows the credit entirely once
+  // disqualified investment income exceeds $11,950.
+  eitc: {
+    maxCredit: [649, 4_328, 7_152, 8_046],
+    phaseOutThresholdMfj: [17_730, 30_470, 30_470, 30_470],
+    phaseOutThresholdOther: [10_620, 23_350, 23_350, 23_350],
+    investmentIncomeLimit: 11_950,
+  },
+  // IRC §25A / IRS Pub. 970 (2025) & Form 8863 instructions: the American
+  // Opportunity Tax Credit is 100% of the first $2,000 of qualified expenses
+  // plus 25% of the next $2,000 (so $2,500 max per student), 40% of which is
+  // refundable. The Lifetime Learning Credit is 20% of up to $10,000 of
+  // expenses per return ($2,000 max). Both phase out over $80,000-$90,000
+  // MAGI ($160,000-$180,000 MFJ) — the Taxpayer Certainty and Disaster Tax
+  // Relief Act of 2020 aligned the LLC range with the AOTC's and froze both,
+  // so unlike most figures in this file they are NOT inflation-indexed.
+  educationCredit: {
+    aotcFirstTierExpenses: 2_000,
+    aotcSecondTierExpenses: 2_000,
+    aotcSecondTierRate: 0.25,
+    aotcRefundableFraction: 0.4,
+    llcExpenseCap: 10_000,
+    llcRate: 0.2,
+    phaseOut: {
+      other: { lower: 80_000, upper: 90_000 },
+      mfj: { lower: 160_000, upper: 180_000 },
+    },
+  },
   // IRC §199A / IRS Rev. Proc. 2024-40: 2025 QBI deduction taxable-income
   // thresholds. Single/HoH/MFS share the "all other filing statuses" figures
   // ($197,300-$247,300); MFJ gets its own ($394,600-$494,600). OBBBA made

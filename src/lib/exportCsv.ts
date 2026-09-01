@@ -35,7 +35,16 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push(toRow(["Input", "Medical expenses", result.medicalExpenses]));
   rows.push(toRow(["Input", "Dependent care expenses", result.dependentCareExpenses]));
   rows.push(toRow(["Input", "Dependent care qualifying persons", result.dependentCareQualifyingPersons]));
-  rows.push(toRow(["Input", "Capital gains / qualified dividends", result.qualifiedDividendsAndLTCG]));
+  rows.push(toRow(["Input", "Long-term capital gains / qualified dividends", result.qualifiedDividendsAndLTCG]));
+  rows.push(toRow(["Input", "Short-term capital gains (taxed as ordinary income)", result.shortTermCapitalGains]));
+  rows.push(toRow(["Input", "Qualified education expenses", result.educationExpenses]));
+  rows.push(
+    toRow([
+      "Input",
+      "Education credit claimed",
+      result.educationCreditType === "aotc" ? "American Opportunity Credit" : "Lifetime Learning Credit",
+    ])
+  );
   rows.push(toRow(["Input", "HSA contribution", result.hsaContribution]));
   rows.push(toRow(["Input", "HSA coverage type", result.hsaCoverageType]));
   rows.push(toRow(["Input", "Traditional 401(k)/403(b) contribution", result.traditional401kContribution]));
@@ -79,6 +88,17 @@ export function exportResultToCsv(result: TaxEstimateResult) {
       ])
     );
   }
+  if (result.educationCreditNonrefundable > 0) {
+    rows.push(
+      toRow([
+        "Result",
+        result.educationCreditType === "aotc"
+          ? "American Opportunity Credit (nonrefundable 60%)"
+          : "Lifetime Learning Credit (nonrefundable)",
+        result.educationCreditNonrefundable.toFixed(2),
+      ])
+    );
+  }
   rows.push(toRow(["Result", "Federal income tax (after credits)", result.federalTax.toFixed(2)]));
   if (result.selfEmploymentTax > 0) {
     rows.push(toRow(["Result", "Self-employment tax", result.selfEmploymentTax.toFixed(2)]));
@@ -86,10 +106,26 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   if (result.netInvestmentIncomeTax > 0) {
     rows.push(toRow(["Result", "Net Investment Income Tax (3.8%)", result.netInvestmentIncomeTax.toFixed(2)]));
   }
+  if (result.additionalMedicareTax > 0) {
+    rows.push(toRow(["Result", "Additional Medicare Tax (0.9%)", result.additionalMedicareTax.toFixed(2)]));
+  }
   if (result.amtAmount > 0) {
     rows.push(toRow(["Result", "Alternative Minimum Tax (simplified)", result.amtAmount.toFixed(2)]));
   }
-  rows.push(toRow(["Result", "Federal total tax", result.federalTotalTax.toFixed(2)]));
+  if (result.refundableCreditsTotal > 0) {
+    rows.push(
+      toRow(["Result", "Federal total tax (before refundable credits)", result.federalTotalTaxBeforeRefundableCredits.toFixed(2)])
+    );
+  }
+  if (result.earnedIncomeCredit > 0) {
+    rows.push(toRow(["Result", "Earned Income Tax Credit (refundable)", result.earnedIncomeCredit.toFixed(2)]));
+  }
+  if (result.educationCreditRefundable > 0) {
+    rows.push(
+      toRow(["Result", "American Opportunity Credit (refundable 40%)", result.educationCreditRefundable.toFixed(2)])
+    );
+  }
+  rows.push(toRow(["Result", "Federal total tax (negative = refund)", result.federalTotalTax.toFixed(2)]));
   rows.push(toRow(["Result", "Federal marginal rate", result.federalMarginalRate]));
   rows.push(toRow(["Result", "Federal effective rate", result.federalEffectiveRate]));
   if (result.state === "CA" && result.caItemizedTotal > 0) {
@@ -243,7 +279,7 @@ export function exportResultToCsv(result: TaxEstimateResult) {
   rows.push("");
   rows.push(
     toRow([
-      "Disclaimer: Unofficial simplified estimate. Excludes EITC, education credits, and payroll taxes on W-2 wages. QBI and AMT (when they apply) use simplified calculations — QBI assumes a single business (no multi-business aggregation); AMT doesn't model disqualifying ISO dispositions, AMT NOL carryforward, AMT foreign tax credit, or California's separate 7% AMT. Deduction/credit amounts (mortgage interest, SALT, medical, dependent care, retirement/HSA contributions, capital gains, NIIT, etc.) are computed from what you entered, not verified against any documents. Not tax advice. Verify against IRS/state guidance or a licensed preparer.",
+      "Disclaimer: Unofficial simplified estimate. Excludes payroll taxes withheld on W-2 wages (see the separate paycheck withholding tool for that). QBI, AMT, the EITC, and the education credits (when they apply) use simplified calculations — QBI assumes a single business (no multi-business aggregation); AMT doesn't model disqualifying ISO dispositions, AMT NOL carryforward, AMT foreign tax credit, or California's separate 7% AMT; the EITC reuses the Child Tax Credit's qualifying-child count and approximates disqualified investment income from capital gains/dividends only; education credits assume a single student under one credit. Deduction/credit amounts (mortgage interest, SALT, medical, dependent care, education, retirement/HSA contributions, capital gains, NIIT, Additional Medicare Tax, etc.) are computed from what you entered, not verified against any documents. Not tax advice. Verify against IRS/state guidance or a licensed preparer.",
     ])
   );
 

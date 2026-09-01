@@ -57,6 +57,21 @@ export default function ResultsPanel({
           California's separate 7% AMT isn't modeled.
         </div>
       )}
+      {result.refundableCreditsTotal > 0 && (
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-3 text-xs text-emerald-900">
+          This estimate includes{" "}
+          {formatCurrency(result.refundableCreditsTotal)} of{" "}
+          <strong>refundable</strong> credits
+          {result.earnedIncomeCredit > 0 ? " (Earned Income Tax Credit" : " ("}
+          {result.earnedIncomeCredit > 0 && result.educationCreditRefundable > 0 ? " + " : ""}
+          {result.educationCreditRefundable > 0 ? "refundable American Opportunity Credit" : ""}
+          ). Unlike the other credits here, these are paid out even when they
+          exceed the tax you owe — so the federal figure below can go
+          negative, meaning a refund rather than a bill. Withholding and
+          estimated payments aren&apos;t modeled, so this isn&apos;t your
+          final refund amount.
+        </div>
+      )}
       {result.dependentCareCreditIsApproximate && result.dependentCareCreditAmount > 0 && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
           The {result.taxYear} Dependent Care Credit rate below is an
@@ -73,7 +88,13 @@ export default function ResultsPanel({
             const parts = [
               result.selfEmploymentTax > 0 ? `${formatCurrency(result.selfEmploymentTax)} SE tax` : null,
               result.netInvestmentIncomeTax > 0 ? `${formatCurrency(result.netInvestmentIncomeTax)} NIIT` : null,
+              result.additionalMedicareTax > 0
+                ? `${formatCurrency(result.additionalMedicareTax)} Additional Medicare`
+                : null,
               result.amtAmount > 0 ? `${formatCurrency(result.amtAmount)} AMT` : null,
+              result.refundableCreditsTotal > 0
+                ? `less ${formatCurrency(result.refundableCreditsTotal)} refundable credits`
+                : null,
             ].filter(Boolean);
             return parts.length > 0 ? `incl. ${parts.join(" + ")}` : undefined;
           })()}
@@ -129,8 +150,14 @@ export default function ResultsPanel({
           )}
           {result.qualifiedDividendsAndLTCG > 0 && (
             <div className="flex justify-between border-b border-slate-100 py-1.5">
-              <dt className="text-slate-500">Capital gains / qualified dividends</dt>
+              <dt className="text-slate-500">Long-term gains / qualified dividends</dt>
               <dd className="font-medium">{formatCurrency(result.qualifiedDividendsAndLTCG)}</dd>
+            </div>
+          )}
+          {result.shortTermCapitalGains > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Short-term gains (taxed as ordinary income)</dt>
+              <dd className="font-medium">{formatCurrency(result.shortTermCapitalGains)}</dd>
             </div>
           )}
           {result.totalAdjustments > 0 && (
@@ -187,6 +214,12 @@ export default function ResultsPanel({
               <dd className="font-medium">{formatCurrency(result.netInvestmentIncomeTax)}</dd>
             </div>
           )}
+          {result.additionalMedicareTax > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Additional Medicare Tax (0.9%)</dt>
+              <dd className="font-medium">{formatCurrency(result.additionalMedicareTax)}</dd>
+            </div>
+          )}
           {result.amtAmount > 0 && (
             <div className="flex justify-between border-b border-slate-100 py-1.5">
               <dt className="text-slate-500">Alternative Minimum Tax (simplified)</dt>
@@ -207,6 +240,28 @@ export default function ResultsPanel({
                 Dependent care credit{result.dependentCareCreditIsApproximate ? " (approx.)" : ""}
               </dt>
               <dd className="font-medium">−{formatCurrency(result.dependentCareCreditAmount)}</dd>
+            </div>
+          )}
+          {result.educationCreditNonrefundable > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">
+                {result.educationCreditType === "aotc"
+                  ? "American Opportunity Credit (nonrefundable 60%)"
+                  : "Lifetime Learning Credit"}
+              </dt>
+              <dd className="font-medium">−{formatCurrency(result.educationCreditNonrefundable)}</dd>
+            </div>
+          )}
+          {result.educationCreditRefundable > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">American Opportunity Credit (refundable 40%)</dt>
+              <dd className="font-medium">−{formatCurrency(result.educationCreditRefundable)}</dd>
+            </div>
+          )}
+          {result.earnedIncomeCredit > 0 && (
+            <div className="flex justify-between border-b border-slate-100 py-1.5">
+              <dt className="text-slate-500">Earned Income Tax Credit (refundable)</dt>
+              <dd className="font-medium">−{formatCurrency(result.earnedIncomeCredit)}</dd>
             </div>
           )}
           <div className="flex justify-between border-b border-slate-100 py-1.5">

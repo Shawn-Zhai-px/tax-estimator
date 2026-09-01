@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { STATES, StateCode } from "@/config";
 import {
   CATCH_UP_LABELS,
   CatchUpEligibility,
@@ -13,6 +15,7 @@ export interface PaycheckFormValues {
   // Step 1 — Essential information
   annualBase: string;
   federalFilingStatus: FederalFilingStatus;
+  state: StateCode;
   payFrequency: PayFrequency;
 
   // Step 2 — Additional information
@@ -82,7 +85,7 @@ function DollarField({
         {label}
       </label>
       <div className="relative mt-1">
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
           $
         </span>
         <input
@@ -143,13 +146,36 @@ export default function PaycheckForm({ values, onChange, step, onBack, onAdvance
   const isLastStep = step === TOTAL_STEPS;
   const isSkippable = step > 1;
 
+  // The Back/Skip/Next row stays mounted across a step change, so focus
+  // naturally stays on whichever button was clicked — but that button sits
+  // AFTER the step's fields in the DOM, so a forward Tab from it skipped
+  // right past the newly-revealed step and out of the form entirely.
+  // Moving focus to the step heading instead puts the new fields next in
+  // tab order, exactly where a forward Tab should go. Skipped on first
+  // mount so loading the wizard doesn't steal focus from the page.
+  const isFirstRender = useRef(true);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    stepHeadingRef.current?.focus();
+  }, [step]);
+
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
           Step {step} of {TOTAL_STEPS}
         </p>
-        <h2 className="text-sm font-semibold text-slate-900">{STEP_TITLES[step - 1]}</h2>
+        <h2
+          ref={stepHeadingRef}
+          tabIndex={-1}
+          className="rounded text-sm font-semibold text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
+        >
+          {STEP_TITLES[step - 1]}
+        </h2>
       </div>
 
       {step === 1 && (
@@ -177,7 +203,30 @@ export default function PaycheckForm({ values, onChange, step, onBack, onAdvance
               ))}
             </select>
             <p className={helpClass}>
-              Form W-4 Step 1(c). Also used as your CA (DE 4) filing status.
+              Form W-4 Step 1(c).{" "}
+              {values.state === "CA" ? "Also used as your CA (DE 4) filing status." : ""}
+            </p>
+          </div>
+          <div>
+            <label htmlFor="paycheckState" className={labelClass}>
+              State
+            </label>
+            <select
+              id="paycheckState"
+              value={values.state}
+              onChange={(e) => update("state", e.target.value as StateCode)}
+              className={`${inputClass} mt-1`}
+            >
+              {STATES.map((s) => (
+                <option key={s.code} value={s.code}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <p className={helpClass}>
+              {values.state === "CA"
+                ? "CA state income tax and SDI withholding are estimated below."
+                : "Texas has no state income tax — only federal/FICA withholding is estimated below."}
             </p>
           </div>
           <div>
@@ -340,13 +389,15 @@ export default function PaycheckForm({ values, onChange, step, onBack, onAdvance
             value={values.step4cExtraWithholding}
             onChange={(v) => update("step4cExtraWithholding", v)}
           />
-          <DollarField
-            id="caAdditionalWithholding"
-            label="CA additional withholding per paycheck"
-            help="Default: 0. Extra flat amount from DE 4 line 3 (does not apply to the bonus)."
-            value={values.caAdditionalWithholding}
-            onChange={(v) => update("caAdditionalWithholding", v)}
-          />
+          {values.state === "CA" && (
+            <DollarField
+              id="caAdditionalWithholding"
+              label="CA additional withholding per paycheck"
+              help="Default: 0. Extra flat amount from DE 4 line 3 (does not apply to the bonus)."
+              value={values.caAdditionalWithholding}
+              onChange={(v) => update("caAdditionalWithholding", v)}
+            />
+          )}
         </div>
       )}
 

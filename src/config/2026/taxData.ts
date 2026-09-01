@@ -159,6 +159,36 @@ export const TAX_DATA_2026: YearTaxData = {
       { min: 306_850, max: null, rate: 0.2 },
     ],
   },
+  // IRC §32 / IRS Rev. Proc. 2025-32: 2026 EITC. Maximum credits rise to
+  // $664 / $4,427 / $7,316 / $8,231 for 0 / 1 / 2 / 3-or-more qualifying
+  // children (the statutory credit percentages applied to 2026 earned income
+  // amounts of $8,680 / $13,020 / $18,290 / $18,290). Phase-out begins at
+  // $10,860 (0 children) or $23,890 (1+) for Single/HoH, and $18,140 /
+  // $31,160 for MFJ. The §32(i) disqualified-investment-income cliff rises
+  // to $12,200.
+  eitc: {
+    maxCredit: [664, 4_427, 7_316, 8_231],
+    phaseOutThresholdMfj: [18_140, 31_160, 31_160, 31_160],
+    phaseOutThresholdOther: [10_860, 23_890, 23_890, 23_890],
+    investmentIncomeLimit: 12_200,
+  },
+  // IRC §25A: identical to 2025. The AOTC/LLC dollar figures are statutory
+  // and the shared $80,000-$90,000 / $160,000-$180,000 MAGI phase-out range
+  // has been frozen (explicitly not inflation-indexed) since the Taxpayer
+  // Certainty and Disaster Tax Relief Act of 2020 — repeated literally here
+  // rather than imported from 2025 so this file stays readable on its own.
+  educationCredit: {
+    aotcFirstTierExpenses: 2_000,
+    aotcSecondTierExpenses: 2_000,
+    aotcSecondTierRate: 0.25,
+    aotcRefundableFraction: 0.4,
+    llcExpenseCap: 10_000,
+    llcRate: 0.2,
+    phaseOut: {
+      other: { lower: 80_000, upper: 90_000 },
+      mfj: { lower: 160_000, upper: 180_000 },
+    },
+  },
   // IRC §199A / IRS Rev. Proc. 2025-32, as amended by OBBBA: 2026 QBI
   // thresholds. OBBBA expanded the phase-in range width (Single/HoH/MFS:
   // $50,000 -> $75,000; MFJ: $100,000 -> $150,000), so thresholdUpper

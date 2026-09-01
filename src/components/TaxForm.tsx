@@ -8,6 +8,7 @@ import {
   SUPPORTED_TAX_YEARS,
   TaxYear,
 } from "@/config";
+import { EducationCreditType, TaxEstimateInput } from "@/lib/calculateTax";
 
 export interface TaxFormValues {
   taxYear: TaxYear;
@@ -29,12 +30,91 @@ export interface TaxFormValues {
   dependentCareExpenses: string;
   dependentCareQualifyingPersons: string;
   qualifiedDividendsAndLTCG: string;
+  shortTermCapitalGains: string;
+  educationExpenses: string;
+  educationCreditType: EducationCreditType;
   hsaContribution: string;
   hsaCoverageType: "self-only" | "family";
   traditional401kContribution: string;
   traditionalIraContribution: string;
   isoExerciseSpread: string;
   privateActivityBondInterest: string;
+}
+
+/**
+ * Starting values for the form. Every optional field starts empty so that
+ * `estimateTax` sees 0/false and behaves exactly as if the feature didn't
+ * exist — the backward-compatibility convention every phase of this
+ * estimator has followed.
+ */
+export const DEFAULT_TAX_FORM_VALUES: TaxFormValues = {
+  taxYear: 2025,
+  grossIncome: "75000",
+  filingStatus: "single",
+  state: "CA",
+  selfEmploymentNetIncome: "",
+  isSpecifiedServiceTradeOrBusiness: false,
+  qualifiedBusinessW2Wages: "",
+  qualifiedBusinessUbia: "",
+  qualifyingChildren: "",
+  otherDependents: "",
+  studentLoanInterestPaid: "",
+  mortgageInterest: "",
+  propertyTax: "",
+  stateIncomeTaxPaid: "",
+  charitableDonations: "",
+  medicalExpenses: "",
+  dependentCareExpenses: "",
+  dependentCareQualifyingPersons: "",
+  qualifiedDividendsAndLTCG: "",
+  shortTermCapitalGains: "",
+  educationExpenses: "",
+  educationCreditType: "aotc",
+  hsaContribution: "",
+  hsaCoverageType: "self-only",
+  traditional401kContribution: "",
+  traditionalIraContribution: "",
+  isoExerciseSpread: "",
+  privateActivityBondInterest: "",
+};
+
+/**
+ * Convert the form's string-typed fields into the numeric shape
+ * `estimateTax` expects. Lives here rather than in the page so that adding a
+ * field to `TaxFormValues` can't leave it silently unwired.
+ */
+export function taxFormValuesToEstimateInput(values: TaxFormValues): TaxEstimateInput {
+  const dollars = (v: string) => Number(v) || 0;
+  return {
+    grossIncome: dollars(values.grossIncome),
+    filingStatus: values.filingStatus,
+    state: values.state,
+    taxYear: values.taxYear,
+    selfEmploymentNetIncome: dollars(values.selfEmploymentNetIncome),
+    isSpecifiedServiceTradeOrBusiness: values.isSpecifiedServiceTradeOrBusiness,
+    qualifiedBusinessW2Wages: dollars(values.qualifiedBusinessW2Wages),
+    qualifiedBusinessUbia: dollars(values.qualifiedBusinessUbia),
+    qualifyingChildren: dollars(values.qualifyingChildren),
+    otherDependents: dollars(values.otherDependents),
+    studentLoanInterestPaid: dollars(values.studentLoanInterestPaid),
+    mortgageInterest: dollars(values.mortgageInterest),
+    propertyTax: dollars(values.propertyTax),
+    stateIncomeTaxPaid: dollars(values.stateIncomeTaxPaid),
+    charitableDonations: dollars(values.charitableDonations),
+    medicalExpenses: dollars(values.medicalExpenses),
+    dependentCareExpenses: dollars(values.dependentCareExpenses),
+    dependentCareQualifyingPersons: dollars(values.dependentCareQualifyingPersons),
+    qualifiedDividendsAndLTCG: dollars(values.qualifiedDividendsAndLTCG),
+    shortTermCapitalGains: dollars(values.shortTermCapitalGains),
+    educationExpenses: dollars(values.educationExpenses),
+    educationCreditType: values.educationCreditType,
+    hsaContribution: dollars(values.hsaContribution),
+    hsaCoverageType: values.hsaCoverageType,
+    traditional401kContribution: dollars(values.traditional401kContribution),
+    traditionalIraContribution: dollars(values.traditionalIraContribution),
+    isoExerciseSpread: dollars(values.isoExerciseSpread),
+    privateActivityBondInterest: dollars(values.privateActivityBondInterest),
+  };
 }
 
 interface TaxFormProps {
@@ -61,7 +141,7 @@ function DollarInput({
         {label}
       </label>
       <div className="relative mt-1">
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
           $
         </span>
         <input
@@ -89,7 +169,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
     <div className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <label htmlFor="taxYear" className="block text-sm font-medium text-slate-700">
-          Tax year (税年)
+          Tax year
         </label>
         <select
           id="taxYear"
@@ -107,14 +187,14 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <DollarInput
         id="grossIncome"
-        label="Wages / gross annual income (W-2, 税前年收入, USD)"
+        label="Wages / gross annual income (W-2, pre-tax, USD)"
         value={values.grossIncome}
         onChange={(v) => update("grossIncome", v)}
       />
 
       <div>
         <label htmlFor="filingStatus" className="block text-sm font-medium text-slate-700">
-          Filing status (报税身份)
+          Filing status
         </label>
         <select
           id="filingStatus"
@@ -132,7 +212,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
 
       <div>
         <label htmlFor="state" className="block text-sm font-medium text-slate-700">
-          State (所在州)
+          State
         </label>
         <select
           id="state"
@@ -245,7 +325,7 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
             Self-employment net income
           </label>
           <div className="relative mt-1">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
               $
             </span>
             <input
@@ -344,7 +424,12 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         <p className="-mt-2 text-xs text-slate-500">
           Child Tax Credit ($2,200/child) and Credit for Other Dependents
           ($500 each), phased out above $200,000 MAGI ($400,000 if married
-          filing jointly). Reduces federal tax only.
+          filing jointly). Reduces federal tax only. The child count here is
+          also used for the <strong>Earned Income Tax Credit</strong>, which
+          we check automatically from your earned income — no extra input
+          needed. (The IRS&apos;s qualifying-child test for the EITC differs
+          slightly from the Child Tax Credit&apos;s; this tool treats them as
+          the same count.)
         </p>
 
         <div>
@@ -366,19 +451,77 @@ export default function TaxForm({ values, onChange }: TaxFormProps) {
         <div>
           <p className="text-sm font-medium text-slate-700">Investment income (optional)</p>
           <p className="mt-1 text-xs text-slate-500">
-            Long-term capital gains and qualified dividends are taxed at
-            preferential 0%/15%/20% federal rates (stacked on top of your
-            ordinary income) instead of ordinary brackets, and may trigger
-            the 3.8% Net Investment Income Tax. California has no
-            preferential rate — it taxes this the same as ordinary income.
+            <strong>How long you held the asset changes the rate.</strong>{" "}
+            Long-term gains (held more than one year) and qualified dividends
+            get preferential 0%/15%/20% federal rates, stacked on top of your
+            ordinary income. Short-term gains (held one year or less) get no
+            break at all — they&apos;re taxed in your ordinary brackets. Both
+            count as investment income for the 3.8% Net Investment Income
+            Tax. California has no preferential rate — it taxes both the same
+            as ordinary income.
           </p>
         </div>
-        <DollarInput
-          id="qualifiedDividendsAndLTCG"
-          label="Long-term capital gains + qualified dividends"
-          value={values.qualifiedDividendsAndLTCG}
-          onChange={(v) => update("qualifiedDividendsAndLTCG", v)}
-        />
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="qualifiedDividendsAndLTCG"
+            label="Long-term gains + qualified dividends (held > 1 year)"
+            value={values.qualifiedDividendsAndLTCG}
+            onChange={(v) => update("qualifiedDividendsAndLTCG", v)}
+          />
+          <DollarInput
+            id="shortTermCapitalGains"
+            label="Short-term capital gains (held ≤ 1 year)"
+            value={values.shortTermCapitalGains}
+            onChange={(v) => update("shortTermCapitalGains", v)}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-slate-100 pt-4">
+        <div>
+          <p className="text-sm font-medium text-slate-700">Education credit (optional)</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Enter tuition and required fees you paid, then pick which credit
+            you qualify for — you can&apos;t claim both for the same student
+            in the same year. The{" "}
+            <strong>American Opportunity Credit</strong> is worth more (up to
+            $2,500, and 40% of it is refundable) but only covers the first
+            four years of undergraduate study, half-time or more. The{" "}
+            <strong>Lifetime Learning Credit</strong> is up to $2,000 (20% of
+            expenses) with no year limit, and isn&apos;t refundable. Both
+            phase out between $80,000 and $90,000 of income ($160,000 to
+            $180,000 married filing jointly) and neither is available if you
+            file separately.
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <DollarInput
+            id="educationExpenses"
+            label="Qualified education expenses"
+            value={values.educationExpenses}
+            onChange={(v) => update("educationExpenses", v)}
+          />
+          <div>
+            <label htmlFor="educationCreditType" className="block text-sm font-medium text-slate-700">
+              Which credit
+            </label>
+            <select
+              id="educationCreditType"
+              value={values.educationCreditType}
+              onChange={(e) => update("educationCreditType", e.target.value as EducationCreditType)}
+              className="mt-1 w-full rounded-md border border-slate-300 py-2 px-3 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+              <option value="aotc">American Opportunity Credit</option>
+              <option value="llc">Lifetime Learning Credit</option>
+            </select>
+          </div>
+        </div>
+        <p className="-mt-2 text-xs text-slate-500">
+          Simplified: one student&apos;s expenses under one credit. We
+          don&apos;t track the American Opportunity Credit&apos;s four-year
+          per-student limit, and we assume the amount you enter is already
+          net of any tax-free scholarships or grants.
+        </p>
       </div>
 
       <div className="space-y-4 border-t border-slate-100 pt-4">

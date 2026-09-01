@@ -182,23 +182,24 @@ export function computeAnnualSchedule(input: PaycheckInput): AnnualScheduleResul
 
     const grossPay = isBonus ? input.bonusAmount : input.annualBase / periodsPerYear;
 
-    const fourZeroOneK = Math.min(
-      grossPay * input.fourZeroOneKRate,
-      Math.max(0, input.fourZeroOneKAnnualLimit - cum401k)
+    // Pre-tax deduction rates and dollar overrides are clamped to zero here
+    // (rather than trusting the UI's non-enforced min={0}) so a negative
+    // rate/amount can never invert into "extra" money — every one of these
+    // is a deduction or a withheld-tax amount, never legitimately negative.
+    const fourZeroOneK = clampToZero(
+      Math.min(grossPay * input.fourZeroOneKRate, Math.max(0, input.fourZeroOneKAnnualLimit - cum401k))
     );
-    const rothCatchUp = Math.min(
-      grossPay * input.rothCatchUpRate,
-      Math.max(0, rothAnnualLimit - cumRoth)
+    const rothCatchUp = clampToZero(
+      Math.min(grossPay * input.rothCatchUpRate, Math.max(0, rothAnnualLimit - cumRoth))
     );
     const depCareFsa = isBonus
       ? 0
-      : Math.min(
-          grossPay * input.depCareFsaRate,
-          Math.max(0, input.depCareFsaAnnualLimit - cumFsa)
+      : clampToZero(
+          Math.min(grossPay * input.depCareFsaRate, Math.max(0, input.depCareFsaAnnualLimit - cumFsa))
         );
-    const healthPremium = isBonus ? 0 : input.annualHealthPremium / periodsPerYear;
+    const healthPremium = isBonus ? 0 : clampToZero(input.annualHealthPremium / periodsPerYear);
 
-    const ficaWagesThisPeriod = grossPay - depCareFsa - healthPremium;
+    const ficaWagesThisPeriod = clampToZero(grossPay - depCareFsa - healthPremium);
     const cumulativeFicaWagesBefore = cumFica;
 
     const socSecTaxable = clampToZero(
@@ -211,7 +212,12 @@ export function computeAnnualSchedule(input: PaycheckInput): AnnualScheduleResul
         clampToZero(cumulativeFicaWagesBefore - ADDL_MEDICARE_THRESHOLD)) *
       ADDL_MEDICARE_RATE;
 
-    const fedCaTaxableWages = ficaWagesThisPeriod - fourZeroOneK;
+    // Clamped for the same reason as ficaWagesThisPeriod above: this feeds
+    // both the bonus flat-rate withholding below and (via clampToZero
+    // wrapping further down) the annualized-wage withholding formulas, and
+    // a 401(k) contribution briefly exceeding one period's FICA wages
+    // shouldn't be able to turn "taxable wages" negative.
+    const fedCaTaxableWages = clampToZero(ficaWagesThisPeriod - fourZeroOneK);
 
     const fedAdjustedAnnualWage = isBonus
       ? null
@@ -237,9 +243,14 @@ export function computeAnnualSchedule(input: PaycheckInput): AnnualScheduleResul
       fedIncTaxWithheld = portion22 * FEDERAL_BONUS_LOW_RATE + portion37 * FEDERAL_BONUS_HIGH_RATE;
     } else {
       const annualTax = applyBrackets(fedAdjustedAnnualWage as number, federalTable).tax;
-      fedIncTaxWithheld =
+      // Outer clamp: step4cExtraWithholding is a user-entered adjustment
+      // (Form W-4 Step 4(c)) added after the bracket-tax clamp above — a
+      // large negative value there shouldn't be able to push withheld tax
+      // below zero.
+      fedIncTaxWithheld = clampToZero(
         clampToZero(annualTax / periodsPerYear - input.step3Credits / periodsPerYear) +
-        input.step4cExtraWithholding;
+          input.step4cExtraWithholding
+      );
     }
 
     let caStateIncTaxWithheld = 0;
@@ -248,10 +259,14 @@ export function computeAnnualSchedule(input: PaycheckInput): AnnualScheduleResul
         caStateIncTaxWithheld = fedCaTaxableWages * CA_BONUS_FLAT_RATE;
       } else {
         const annualCaTax = applyBrackets(caTaxableIncomeAnnual as number, caTable).tax;
-        caStateIncTaxWithheld =
+        // Outer clamp for the same reason as fedIncTaxWithheld above:
+        // caAdditionalWithholding is a user-entered flat add-on (DE 4 line
+        // 3) added after the bracket-tax clamp.
+        caStateIncTaxWithheld = clampToZero(
           clampToZero(annualCaTax - input.caRegularAllowances * CA_EXEMPTION_CREDIT_PER_ALLOWANCE) /
             periodsPerYear +
-          input.caAdditionalWithholding;
+            input.caAdditionalWithholding
+        );
       }
     }
 

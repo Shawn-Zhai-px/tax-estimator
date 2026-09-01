@@ -44,7 +44,15 @@ export function exportResultToPdf(result: TaxEstimateResult) {
     line(`Dependent care: ${formatCurrency(result.dependentCareExpenses)} for ${result.dependentCareQualifyingPersons} qualifying person(s)`);
   }
   if (result.qualifiedDividendsAndLTCG > 0) {
-    line(`Capital gains / qualified dividends: ${formatCurrency(result.qualifiedDividendsAndLTCG)}`);
+    line(`Long-term capital gains / qualified dividends: ${formatCurrency(result.qualifiedDividendsAndLTCG)}`);
+  }
+  if (result.shortTermCapitalGains > 0) {
+    line(`Short-term capital gains (taxed as ordinary income): ${formatCurrency(result.shortTermCapitalGains)}`);
+  }
+  if (result.educationExpenses > 0) {
+    line(
+      `Education expenses: ${formatCurrency(result.educationExpenses)} (${result.educationCreditType === "aotc" ? "American Opportunity Credit" : "Lifetime Learning Credit"})`
+    );
   }
   if (result.hsaContribution > 0 || result.traditional401kContribution > 0 || result.traditionalIraContribution > 0) {
     line(
@@ -76,18 +84,44 @@ export function exportResultToPdf(result: TaxEstimateResult) {
       `  less dependent care credit${result.dependentCareCreditIsApproximate ? " (approx. rate)" : ""}: ${formatCurrency(result.dependentCareCreditAmount)}`
     );
   }
+  if (result.educationCreditNonrefundable > 0) {
+    line(
+      `  less ${result.educationCreditType === "aotc" ? "American Opportunity Credit (nonrefundable 60%)" : "Lifetime Learning Credit"}: ${formatCurrency(result.educationCreditNonrefundable)}`
+    );
+  }
   line(`Federal income tax: ${formatCurrency(result.federalTax)}  (marginal rate ${formatPercent(result.federalMarginalRate)})`);
-  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0 || result.amtAmount > 0) {
+  if (
+    result.selfEmploymentTax > 0 ||
+    result.netInvestmentIncomeTax > 0 ||
+    result.additionalMedicareTax > 0 ||
+    result.amtAmount > 0
+  ) {
     if (result.selfEmploymentTax > 0) {
       line(`  plus self-employment tax: ${formatCurrency(result.selfEmploymentTax)}`);
     }
     if (result.netInvestmentIncomeTax > 0) {
       line(`  plus Net Investment Income Tax (3.8%): ${formatCurrency(result.netInvestmentIncomeTax)}`);
     }
+    if (result.additionalMedicareTax > 0) {
+      line(`  plus Additional Medicare Tax (0.9%): ${formatCurrency(result.additionalMedicareTax)}`);
+    }
     if (result.amtAmount > 0) {
       line(`  plus Alternative Minimum Tax (simplified): ${formatCurrency(result.amtAmount)}`);
     }
-    line(`Federal total tax: ${formatCurrency(result.federalTotalTax)}`, 11, true);
+    line(
+      `Federal total tax${result.refundableCreditsTotal > 0 ? " (before refundable credits)" : ""}: ${formatCurrency(result.federalTotalTaxBeforeRefundableCredits)}`,
+      11,
+      true
+    );
+  }
+  if (result.earnedIncomeCredit > 0) {
+    line(`  less Earned Income Tax Credit (refundable): ${formatCurrency(result.earnedIncomeCredit)}`);
+  }
+  if (result.educationCreditRefundable > 0) {
+    line(`  less American Opportunity Credit (refundable 40%): ${formatCurrency(result.educationCreditRefundable)}`);
+  }
+  if (result.refundableCreditsTotal > 0) {
+    line(`Federal total tax (negative = refund): ${formatCurrency(result.federalTotalTax)}`, 11, true);
   }
   if (result.state === "CA") {
     if (result.hsaDeduction > 0) {
@@ -129,8 +163,11 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   spacer(14);
   line("Federal Form 1040 line reference", 13, true);
   line(`1a  Wages (from Form W-2, box 1): ${formatCurrency(result.grossIncome)}`, 9.5);
-  if (result.qualifiedDividendsAndLTCG > 0) {
-    line(`7   Capital gain (or loss): ${formatCurrency(result.qualifiedDividendsAndLTCG)}`, 9.5);
+  if (result.qualifiedDividendsAndLTCG > 0 || result.shortTermCapitalGains > 0) {
+    line(
+      `7   Capital gain (or loss) (Schedule D: short-term + long-term): ${formatCurrency(result.qualifiedDividendsAndLTCG + result.shortTermCapitalGains)}`,
+      9.5
+    );
   }
   if (result.selfEmploymentNetIncome > 0) {
     line(`8   Additional income (Schedule 1: self-employment profit): ${formatCurrency(result.selfEmploymentNetIncome)}`, 9.5);
@@ -158,24 +195,49 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   if (result.dependentCreditAmount > 0) {
     line(`19  Child tax credit / credit for other dependents: ${formatCurrency(result.dependentCreditAmount)}`, 9.5);
   }
-  if (result.dependentCareCreditAmount > 0) {
+  if (result.dependentCareCreditAmount > 0 || result.educationCreditNonrefundable > 0) {
+    const schedule3Parts = [
+      result.dependentCareCreditAmount > 0
+        ? `dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}`
+        : null,
+      result.educationCreditNonrefundable > 0
+        ? `nonrefundable education credit (${result.educationCreditType === "aotc" ? "American Opportunity" : "Lifetime Learning"})`
+        : null,
+    ].filter(Boolean);
     line(
-      `20  Schedule 3: dependent care credit${result.dependentCareCreditIsApproximate ? " (approx.)" : ""}: ${formatCurrency(result.dependentCareCreditAmount)}`,
+      `20  Schedule 3: ${schedule3Parts.join(" + ")}: ${formatCurrency(result.dependentCareCreditAmount + result.educationCreditNonrefundable)}`,
       9.5
     );
   }
   line(`22  Subtotal after credits: ${formatCurrency(result.federalTax + result.amtAmount)}`, 9.5);
-  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0) {
+  if (result.selfEmploymentTax > 0 || result.netInvestmentIncomeTax > 0 || result.additionalMedicareTax > 0) {
     const otherTaxParts = [
       result.selfEmploymentTax > 0 ? "self-employment tax" : null,
       result.netInvestmentIncomeTax > 0 ? "Net Investment Income Tax" : null,
+      result.additionalMedicareTax > 0 ? "Additional Medicare Tax (Form 8959)" : null,
     ].filter(Boolean);
     line(
-      `23  Other taxes (Schedule 2: ${otherTaxParts.join(" + ")}): ${formatCurrency(result.selfEmploymentTax + result.netInvestmentIncomeTax)}`,
+      `23  Other taxes (Schedule 2: ${otherTaxParts.join(" + ")}): ${formatCurrency(result.selfEmploymentTax + result.netInvestmentIncomeTax + result.additionalMedicareTax)}`,
       9.5
     );
   }
-  line(`24  Total tax: ${formatCurrency(result.federalTotalTax)}`, 9.5);
+  line(`24  Total tax: ${formatCurrency(result.federalTotalTaxBeforeRefundableCredits)}`, 9.5);
+  if (result.earnedIncomeCredit > 0) {
+    line(`27  Earned income credit (EIC): ${formatCurrency(result.earnedIncomeCredit)}`, 9.5);
+  }
+  if (result.educationCreditRefundable > 0) {
+    line(
+      `29  American opportunity credit, refundable portion (Form 8863 line 8): ${formatCurrency(result.educationCreditRefundable)}`,
+      9.5
+    );
+  }
+  if (result.refundableCreditsTotal > 0) {
+    line(
+      `33  Total payments (refundable credits only — no withholding modeled): ${formatCurrency(result.refundableCreditsTotal)}`,
+      9.5
+    );
+    line(`34/37 Amount owed, or refunded if negative: ${formatCurrency(result.federalTotalTax)}`, 9.5, true);
+  }
 
   if (result.state === "CA") {
     const taxBeforeCredits = result.stateTax - result.caMentalHealthTax;
@@ -208,11 +270,14 @@ export function exportResultToPdf(result: TaxEstimateResult) {
   const disclaimerY = y;
   const disclaimerText = doc.splitTextToSize(
     "Disclaimer: This is an unofficial, simplified estimate. Deduction/credit amounts (mortgage interest, SALT, medical, dependent " +
-      "care, retirement/HSA contributions, capital gains, NIIT, etc.) are computed from what you entered, not verified against any " +
-      "documents. Excludes EITC, education credits, and payroll taxes on W-2 wages. QBI and AMT (when they apply) use simplified " +
-      "calculations — QBI assumes a single business with no multi-business aggregation; AMT doesn't model disqualifying ISO " +
-      "dispositions, AMT NOL carryforward, AMT foreign tax credit, or California's separate 7% AMT. It is not prepared by a tax " +
-      "professional and is not a substitute for filing software or a licensed CPA / tax preparer. Verify all figures against current IRS and state guidance before relying on them.",
+      "care, education, retirement/HSA contributions, capital gains, NIIT, Additional Medicare Tax, EITC, etc.) are computed from what " +
+      "you entered, not verified against any documents. QBI, AMT, the EITC, and the education credits use simplified calculations — " +
+      "QBI assumes a single business with no multi-business aggregation; AMT doesn't model disqualifying ISO dispositions, AMT NOL " +
+      "carryforward, AMT foreign tax credit, or California's separate 7% AMT; the EITC reuses the Child Tax Credit's qualifying-child " +
+      "count and approximates disqualified investment income from capital gains/dividends only; education credits assume a single " +
+      "student under one credit, already net of scholarships. Excludes payroll taxes withheld on W-2 wages (see the separate paycheck " +
+      "withholding tool for that). It is not prepared by a tax professional and is not a substitute for filing software or a licensed " +
+      "CPA / tax preparer. Verify all figures against current IRS and state guidance before relying on them.",
     500
   );
   doc.rect(marginX - 8, disclaimerY - 12, 512, disclaimerText.length * 12 + 16, "FD");

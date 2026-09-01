@@ -6,6 +6,9 @@ import {
   getTaxDataForYear,
 } from "@/config";
 
+/** Which of the two IRC §25A education credits the entered expenses are claimed under. */
+export type EducationCreditType = "aotc" | "llc";
+
 export interface TaxEstimateInput {
   /** Gross annual W-2/wage income before deductions. */
   grossIncome: number;
@@ -34,6 +37,12 @@ export interface TaxEstimateInput {
   dependentCareQualifyingPersons?: number;
   /** Optional: long-term capital gains + qualified dividends (taxed at preferential 0%/15%/20% rates, and subject to the NIIT). */
   qualifiedDividendsAndLTCG?: number;
+  /** Optional: short-term capital gains (assets held one year or less) — taxed as ordinary income, but still net investment income for the NIIT. */
+  shortTermCapitalGains?: number;
+  /** Optional: qualified education expenses (tuition/fees) for the education credit selected below. */
+  educationExpenses?: number;
+  /** Which education credit the expenses above are claimed under. Defaults to "aotc" (a taxpayer can't claim both for the same student). */
+  educationCreditType?: EducationCreditType;
   /** Optional: HSA contribution (federal-deductible; CA does not conform — see caAGI). */
   hsaContribution?: number;
   /** HDHP coverage type, changes the HSA contribution limit. Defaults to "self-only" if omitted. */
@@ -100,10 +109,14 @@ export interface TaxEstimateResult {
 
   /** Long-term capital gains + qualified dividends entered (taxed at preferential rates federally; ordinary income for CA, which has no capital-gains carve-out). */
   qualifiedDividendsAndLTCG: number;
-  /** Federal tax on the capital-gains/dividends portion of taxable income, at the 0%/15%/20% preferential rates (stacked on top of ordinary income). */
+  /** Short-term capital gains entered — taxed at ordinary rates, so they never reach the preferential-rate stacking below. */
+  shortTermCapitalGains: number;
+  /** Federal tax on the capital-gains/dividends portion of taxable income, at the 0%/15%/20% preferential rates (stacked on top of ordinary income). Short-term gains are excluded — they're already inside the ordinary bracket tax. */
   capitalGainsTax: number;
   /** Net Investment Income Tax (3.8% on the lesser of net investment income or MAGI over the filing-status threshold). Federal only — CA has no NIIT. */
   netInvestmentIncomeTax: number;
+  /** Additional Medicare Tax (0.9% on wages + self-employment earnings over the filing-status threshold). Independent of, and additive with, the NIIT. */
+  additionalMedicareTax: number;
 
   qualifyingChildren: number;
   otherDependents: number;
@@ -131,6 +144,22 @@ export interface TaxEstimateResult {
   dependentCareCreditAmount: number;
   /** True if this year's dependent care credit rate schedule is a best-effort approximation (2026, post-OBBBA). */
   dependentCareCreditIsApproximate: boolean;
+
+  /**
+   * Earned Income Tax Credit — fully refundable, so it reduces
+   * `federalTotalTax` below zero rather than stopping at zero. Reuses
+   * `qualifyingChildren` as the qualifying-child count (see
+   * calculateEarnedIncomeCredit for that and the other simplifications).
+   */
+  earnedIncomeCredit: number;
+  educationExpenses: number;
+  educationCreditType: EducationCreditType;
+  /** The nonrefundable part of the education credit (all of the LLC; 60% of the AOTC) — offsets income tax alongside the other nonrefundable credits. */
+  educationCreditNonrefundable: number;
+  /** The refundable part of the education credit (40% of the AOTC; always 0 for the LLC). */
+  educationCreditRefundable: number;
+  /** Refundable credits in total: EITC + the refundable AOTC portion. */
+  refundableCreditsTotal: number;
 
   deductionUsed: number;
   deductionType: "standard" | "itemized";
@@ -160,7 +189,16 @@ export interface TaxEstimateResult {
    * tax. Federal only — CA's separate 7% AMT isn't modeled.
    */
   amtAmount: number;
-  /** Federal income tax (incl. capital gains tax and AMT) + self-employment tax + NIIT (the federal "total tax" line). */
+  /** Federal income tax (incl. capital gains tax and AMT) + self-employment tax + NIIT + Additional Medicare Tax — Form 1040 line 24, "total tax". */
+  federalTotalTaxBeforeRefundableCredits: number;
+  /**
+   * `federalTotalTaxBeforeRefundableCredits` net of refundable credits (EITC
+   * and the refundable AOTC portion). Goes negative when those credits
+   * exceed the tax owed, which is the correct result — that's a refund. On
+   * the real 1040 refundable credits sit in the Payments section (lines
+   * 27/29) rather than reducing line 24, so this is the estimator's
+   * bottom-line number, not literally a 1040 line.
+   */
   federalTotalTax: number;
 
   stateTaxableIncome: number;
@@ -202,12 +240,31 @@ const NIIT_THRESHOLD_MFJ = 250_000;
 const NIIT_THRESHOLD_MFS = 125_000;
 const NIIT_THRESHOLD_OTHER = 200_000;
 
+// Additional Medicare Tax (IRC §3101(b)(2) on wages, §1401(b)(2) on
+// self-employment earnings) — 0.9%. Like NIIT's, these thresholds are fixed
+// by statute and have never been indexed for inflation since the tax took
+// effect in 2013, so 2025 and 2026 use the same figures. Note this is a
+// separate tax from the NIIT above: a taxpayer with both wage and
+// investment income can owe both in full, and neither offsets the other.
+const ADDITIONAL_MEDICARE_RATE = 0.009;
+const ADDITIONAL_MEDICARE_THRESHOLD_MFJ = 250_000;
+const ADDITIONAL_MEDICARE_THRESHOLD_MFS = 125_000;
+const ADDITIONAL_MEDICARE_THRESHOLD_OTHER = 200_000;
+
+// IRC §32(b)(1) EITC credit and phase-out percentages, indexed by number of
+// qualifying children ([0, 1, 2, 3-or-more]). Written into the statute, so
+// unlike the dollar amounts in ../config/<year>/taxData.ts they aren't
+// inflation-indexed.
+const EITC_CREDIT_RATE = [0.0765, 0.34, 0.4, 0.45];
+const EITC_PHASE_OUT_RATE = [0.0765, 0.1598, 0.2106, 0.2106];
+
 /**
  * Self-employment tax on net Schedule C profit: 92.35% of net earnings is
  * subject to 12.4% Social Security (capped at the year's wage base, net of
  * any W-2 wages that already used up that base) + 2.9% Medicare (no cap).
- * The Additional Medicare surtax on self-employment income is not modeled
- * (same omission as the rest of this estimator).
+ * The 0.9% Additional Medicare surtax on the same earnings is computed
+ * separately by `calculateAdditionalMedicareTax`, because it also takes
+ * wages into account and is reported on its own form (Form 8959).
  */
 function calculateSelfEmploymentTax(
   netSelfEmploymentIncome: number,
@@ -354,6 +411,135 @@ function calculateNiit(netInvestmentIncome: number, magi: number, filingStatus: 
     filingStatus === "mfj" ? NIIT_THRESHOLD_MFJ : filingStatus === "mfs" ? NIIT_THRESHOLD_MFS : NIIT_THRESHOLD_OTHER;
   const magiOverThreshold = clampToZero(magi - threshold);
   return NIIT_RATE * Math.min(clampToZero(netInvestmentIncome), magiOverThreshold);
+}
+
+/**
+ * Additional Medicare Tax (Form 8959): 0.9% on wages plus net
+ * self-employment earnings over the filing-status threshold. Form 8959
+ * computes wages (Part I) and self-employment earnings (Part II) in
+ * sequence, reducing the Part II threshold by the wages already counted —
+ * which is arithmetically the same as applying one threshold to the two
+ * combined, as here.
+ *
+ * This is a wholly separate tax from the NIIT, not an alternative to it:
+ * the NIIT hits investment income, this hits earned income, the two bases
+ * never overlap, and a taxpayer with enough of both owes both in full.
+ * Not modeled: the employer's over-$200,000 withholding (which only affects
+ * how much is prepaid, never the liability itself), and Railroad Retirement
+ * (RRTA) compensation.
+ */
+function calculateAdditionalMedicareTax(
+  wages: number,
+  netSelfEmploymentEarnings: number,
+  filingStatus: FilingStatus
+): number {
+  const threshold =
+    filingStatus === "mfj"
+      ? ADDITIONAL_MEDICARE_THRESHOLD_MFJ
+      : filingStatus === "mfs"
+        ? ADDITIONAL_MEDICARE_THRESHOLD_MFS
+        : ADDITIONAL_MEDICARE_THRESHOLD_OTHER;
+  const base = clampToZero(wages) + clampToZero(netSelfEmploymentEarnings);
+  return ADDITIONAL_MEDICARE_RATE * clampToZero(base - threshold);
+}
+
+/**
+ * Earned Income Tax Credit (IRC §32): the credit phases in at a statutory
+ * rate on earned income up to the year's maximum, holds flat across a
+ * plateau, then phases out against the greater of earned income or AGI
+ * above the filing-status threshold. §32(i) denies it outright — a cliff,
+ * not a phase-out — once disqualified investment income exceeds the year's
+ * limit, no matter how low earned income is.
+ *
+ * Simplifications. This reuses the Child Tax Credit's `qualifyingChildren`
+ * count as the EITC qualifying-child count; the two tests genuinely differ
+ * in the law (EITC has no under-17 ceiling for full-time students or
+ * permanently disabled children and adds its own residency test, while CTC
+ * adds a support test), so a filer whose real counts diverge would need to
+ * adjust. Disqualified income is approximated by the capital gains and
+ * dividends entered — the statute also counts interest (taxable and
+ * tax-exempt) and net rental/royalty/passive income, which this tool has no
+ * inputs for. The childless-filer age test (25 to 64) isn't modeled, and
+ * Married Filing Separately is treated as ineligible: post-ARPA §32(d) does
+ * let a separated spouse living apart claim it, but that turns on household
+ * facts this tool deliberately doesn't collect.
+ */
+function calculateEarnedIncomeCredit(
+  earnedIncome: number,
+  agi: number,
+  disqualifiedInvestmentIncome: number,
+  qualifyingChildren: number,
+  filingStatus: FilingStatus,
+  yearData: ReturnType<typeof getTaxDataForYear>
+): number {
+  const { maxCredit, phaseOutThresholdMfj, phaseOutThresholdOther, investmentIncomeLimit } = yearData.eitc;
+  if (filingStatus === "mfs" || clampToZero(disqualifiedInvestmentIncome) > investmentIncomeLimit) {
+    return 0;
+  }
+
+  const tier = Math.min(Math.floor(clampToZero(qualifyingChildren)), 3);
+  const safeEarnedIncome = clampToZero(earnedIncome);
+  const phasedInCredit = Math.min(EITC_CREDIT_RATE[tier] * safeEarnedIncome, maxCredit[tier]);
+
+  const threshold = (filingStatus === "mfj" ? phaseOutThresholdMfj : phaseOutThresholdOther)[tier];
+  const phaseOutBase = Math.max(safeEarnedIncome, clampToZero(agi));
+  const reduction = EITC_PHASE_OUT_RATE[tier] * clampToZero(phaseOutBase - threshold);
+
+  return clampToZero(Math.min(phasedInCredit, maxCredit[tier] - reduction));
+}
+
+/**
+ * Education credits (IRC §25A / Form 8863) — the American Opportunity Tax
+ * Credit or the Lifetime Learning Credit, whichever the user selected. AOTC
+ * counts 100% of the first tier of qualified expenses plus 25% of the next,
+ * and 40% of the resulting credit is refundable; the LLC is a flat
+ * percentage of expenses up to its own cap and is entirely nonrefundable.
+ * Both reduce pro-rata across the same MAGI phase-out range, and neither is
+ * available to Married Filing Separately (§25A(g)(6)).
+ *
+ * Simplifications. AOTC is legally per-student and LLC per-return, and a
+ * return with several students can claim a different credit for each; this
+ * tool takes one expense figure under one chosen credit, which is why the
+ * two are offered as an either/or rather than computed together. It also
+ * doesn't track AOTC's four-years-per-student lifetime limit, its half-time
+ * enrollment and no-felony-drug-conviction tests, or the requirement that
+ * qualified expenses first be reduced by tax-free scholarships and grants —
+ * so the figure entered is trusted as already-qualified expenses.
+ */
+function calculateEducationCredit(
+  expenses: number,
+  creditType: EducationCreditType,
+  magi: number,
+  filingStatus: FilingStatus,
+  yearData: ReturnType<typeof getTaxDataForYear>
+): { nonrefundable: number; refundable: number } {
+  const none = { nonrefundable: 0, refundable: 0 };
+  const safeExpenses = clampToZero(expenses);
+  if (filingStatus === "mfs" || safeExpenses <= 0) {
+    return none;
+  }
+
+  const ec = yearData.educationCredit;
+  const range = filingStatus === "mfj" ? ec.phaseOut.mfj : ec.phaseOut.other;
+  const remainingFraction = clampToZero(Math.min(1, (range.upper - magi) / (range.upper - range.lower)));
+  if (remainingFraction <= 0) {
+    return none;
+  }
+
+  if (creditType === "llc") {
+    return {
+      nonrefundable: Math.min(safeExpenses, ec.llcExpenseCap) * ec.llcRate * remainingFraction,
+      refundable: 0,
+    };
+  }
+
+  const firstTier = Math.min(safeExpenses, ec.aotcFirstTierExpenses);
+  const secondTier = Math.min(clampToZero(safeExpenses - ec.aotcFirstTierExpenses), ec.aotcSecondTierExpenses);
+  const credit = (firstTier + secondTier * ec.aotcSecondTierRate) * remainingFraction;
+  return {
+    refundable: credit * ec.aotcRefundableFraction,
+    nonrefundable: credit * (1 - ec.aotcRefundableFraction),
+  };
 }
 
 /**
@@ -553,7 +739,12 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
 
   // --- Total income -> adjustments -> AGI ---
   const qualifiedDividendsAndLTCG = clampToZero(input.qualifiedDividendsAndLTCG ?? 0);
-  const totalIncome = safeIncome + selfEmploymentNetIncome + qualifiedDividendsAndLTCG;
+  // Short-term gains (held one year or less) get no preferential rate — they
+  // join ordinary income here and are simply never handed to the
+  // capital-gains stacking below, which is what makes them ordinary.
+  const shortTermCapitalGains = clampToZero(input.shortTermCapitalGains ?? 0);
+  const totalIncome =
+    safeIncome + selfEmploymentNetIncome + qualifiedDividendsAndLTCG + shortTermCapitalGains;
   // MAGI for the student loan deduction is AGI computed before that
   // deduction itself (Pub. 970) — i.e. total income minus every other
   // adjustment we model.
@@ -658,8 +849,46 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     yearData.dependentCareCredit
   );
 
-  const federalTax = clampToZero(federalTaxBeforeCredits - dependentCreditAmount - dependentCareCreditAmount);
-  const netInvestmentIncomeTax = calculateNiit(qualifiedDividendsAndLTCG, federalAGI, filingStatus);
+  // --- Education credits (federal only; CA has no equivalent) ---
+  const educationExpenses = clampToZero(input.educationExpenses ?? 0);
+  const educationCreditType = input.educationCreditType ?? "aotc";
+  const educationCredit = calculateEducationCredit(
+    educationExpenses,
+    educationCreditType,
+    federalAGI,
+    filingStatus,
+    yearData
+  );
+
+  const federalTax = clampToZero(
+    federalTaxBeforeCredits - dependentCreditAmount - dependentCareCreditAmount - educationCredit.nonrefundable
+  );
+  // Both gain types are net investment income for §1411 purposes; only the
+  // long-term half got the preferential rate above.
+  const netInvestmentIncomeTax = calculateNiit(
+    qualifiedDividendsAndLTCG + shortTermCapitalGains,
+    federalAGI,
+    filingStatus
+  );
+  const additionalMedicareTax = calculateAdditionalMedicareTax(
+    safeIncome,
+    selfEmploymentNetIncome * SE_NET_EARNINGS_FACTOR,
+    filingStatus
+  );
+
+  // --- Earned Income Tax Credit (refundable) ---
+  // Earned income is wages plus net self-employment earnings reduced by the
+  // deductible half of self-employment tax, per the Pub. 596 worksheet.
+  const eitcEarnedIncome = safeIncome + clampToZero(selfEmploymentNetIncome - selfEmploymentTaxDeduction);
+  const earnedIncomeCredit = calculateEarnedIncomeCredit(
+    eitcEarnedIncome,
+    federalAGI,
+    qualifiedDividendsAndLTCG + shortTermCapitalGains,
+    qualifyingChildren,
+    filingStatus,
+    yearData
+  );
+  const refundableCreditsTotal = earnedIncomeCredit + educationCredit.refundable;
 
   // --- Alternative Minimum Tax (federal only, simplified) ---
   const isoExerciseSpread = clampToZero(input.isoExerciseSpread ?? 0);
@@ -675,7 +904,12 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     yearData
   );
 
-  const federalTotalTax = federalTax + amtAmount + selfEmploymentTax + netInvestmentIncomeTax;
+  const federalTotalTaxBeforeRefundableCredits =
+    federalTax + amtAmount + selfEmploymentTax + netInvestmentIncomeTax + additionalMedicareTax;
+  // Deliberately not clamped at zero: refundable credits that exceed the tax
+  // owed produce a refund, and showing that as a negative federal tax is the
+  // whole point of modelling them.
+  const federalTotalTax = federalTotalTaxBeforeRefundableCredits - refundableCreditsTotal;
 
   // --- State ---
   let stateTaxableIncome = 0;
@@ -747,8 +981,10 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     federalAGI,
     caAGI,
     qualifiedDividendsAndLTCG,
+    shortTermCapitalGains,
     capitalGainsTax,
     netInvestmentIncomeTax,
+    additionalMedicareTax,
     qualifyingChildren,
     otherDependents,
     dependentCreditAmount,
@@ -766,6 +1002,12 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     dependentCareQualifyingPersons,
     dependentCareCreditAmount,
     dependentCareCreditIsApproximate: yearData.dependentCareCredit.isRateApproximate,
+    earnedIncomeCredit,
+    educationExpenses,
+    educationCreditType,
+    educationCreditNonrefundable: educationCredit.nonrefundable,
+    educationCreditRefundable: educationCredit.refundable,
+    refundableCreditsTotal,
     deductionUsed,
     deductionType,
     isSpecifiedServiceTradeOrBusiness,
@@ -781,6 +1023,7 @@ export function estimateTax(input: TaxEstimateInput): TaxEstimateResult {
     isoExerciseSpread,
     privateActivityBondInterest,
     amtAmount,
+    federalTotalTaxBeforeRefundableCredits,
     federalTotalTax,
     stateTaxableIncome,
     stateTax: totalStateTax,

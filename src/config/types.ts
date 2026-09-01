@@ -123,6 +123,47 @@ export interface YearTaxData {
   capitalGainsBrackets: Record<FilingStatus, TaxBracket[]>;
 
   /**
+   * Earned Income Tax Credit (IRC §32). Every array is indexed by number of
+   * qualifying children: `[0 children, 1, 2, 3 or more]`. The credit and
+   * phase-out *percentages* aren't here because they're fixed by statute
+   * (§32(b)(1)) and never indexed — see EITC_CREDIT_RATE in
+   * ../../lib/calculateTax.ts.
+   */
+  eitc: {
+    /** Maximum credit at the top of the phase-in, per the year's published table. */
+    maxCredit: [number, number, number, number];
+    /** Phase-out begins above this income for Married Filing Jointly. */
+    phaseOutThresholdMfj: [number, number, number, number];
+    /** Phase-out begins above this income for every other filing status. */
+    phaseOutThresholdOther: [number, number, number, number];
+    /** §32(i) disqualified-investment-income cliff: over this, no credit at all. */
+    investmentIncomeLimit: number;
+  };
+
+  /**
+   * Education credits (IRC §25A) — the American Opportunity Tax Credit and
+   * the Lifetime Learning Credit. Both share one MAGI phase-out range and
+   * neither is available to Married Filing Separately.
+   */
+  educationCredit: {
+    /** AOTC counts 100% of qualified expenses up to this amount. */
+    aotcFirstTierExpenses: number;
+    /** AOTC then counts `aotcSecondTierRate` of the next this-many dollars. */
+    aotcSecondTierExpenses: number;
+    aotcSecondTierRate: number;
+    /** Fraction of the (post-phase-out) AOTC that is refundable. */
+    aotcRefundableFraction: number;
+    /** LLC counts `llcRate` of qualified expenses up to this cap, per return. */
+    llcExpenseCap: number;
+    llcRate: number;
+    /** Shared MAGI phase-out range; the credit reduces pro-rata across it. */
+    phaseOut: {
+      other: { lower: number; upper: number };
+      mfj: { lower: number; upper: number };
+    };
+  };
+
+  /**
    * Qualified Business Income deduction (Section 199A). Single/HoH/MFS share
    * the same thresholds ("all other filing statuses" per IRS); MFJ has its
    * own (roughly double) thresholds. CA does not conform — federal only.

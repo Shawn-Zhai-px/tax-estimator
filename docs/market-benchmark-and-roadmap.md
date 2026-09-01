@@ -34,7 +34,7 @@ Tier 1 产品的免费版功能范围（用于判断"税务计算覆盖面"该�
 |---|---|---|
 | **FreeTaxUSA** | 联邦申报永久免费，含自雇（Schedule C/SE）、K-1、投资收入、分项扣除——不因为"复杂"而分层收费，州申报统一 $15.99 | 无实质"更高级"档位，主要按"联邦免费+州付费"收费 |
 | **TurboTax** | Free Edition 仅覆盖最简单的 1040（约 37% 报税人符合），2026 起取消了 Basic 档 | Deluxe（分项扣除/教育抵免，~$79 联邦）、Premium（合并了原 Premier + Self-Employed，含投资/租金/自雇，~$139 联邦） |
-| **H&R Block** | Free 档覆盖简单 W-2 + 学生贷款利息 + CTC + EITC | Deluxe（房贷/HSA/自雇副业）、Premium（房租/投资/加密货币）、Self-Employed（折旧等） |
+| **H&R Block** | Free 档覆盖简单 W-2 + 学生贷款利息 + CTC + EITC | Deluxe（房贷/HSA/自雇副业）、Premium（房租/投资 /加密货币）、Self-Employed（折旧等） |
 | **Cash App Taxes** | 完全免费、单一档位，含自雇（Schedule C）、投资、租金收入（Schedule E）——但**不支持多州申报、不支持 Form 2210（预估税罚款）** | 无付费档 |
 
 Tier 2（真正同类的纯估算工具）目前的已知短板（这对我们反而是差异化机会）：

@@ -869,6 +869,463 @@ console.log("\n== Phase D: Alternative Minimum Tax ==");
   }
 }
 
+console.log("\n== Phase E: short-term vs. long-term capital gains ==");
+{
+  // $40,000 of purely SHORT-term gains, no wages, single 2025. The identical
+  // amount entered as long-term gains is taxed at $0 (see the Phase C test
+  // above) because it all fits inside the 0% preferential bracket — short-
+  // term gains instead run through the ordinary brackets after the standard
+  // deduction.
+  const result = estimateTax({
+    grossIncome: 0,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    shortTermCapitalGains: 40_000,
+  });
+  const taxable = 40_000 - 15_750; // 24,250
+  const expectedOrdinaryTax = 11_925 * 0.1 + (taxable - 11_925) * 0.12;
+  check("short-term gains are taxed at ordinary rates", result.federalTaxBeforeCredits, expectedOrdinaryTax);
+  check("short-term gains produce no preferential-rate tax", result.capitalGainsTax, 0);
+  check("short-term gains are included in total income", result.totalIncome, 40_000);
+}
+
+{
+  // $60,000 wages + $10,000 short-term + $20,000 long-term, single 2025.
+  // Ordinary taxable income is wages + short-term - standard deduction
+  // ($54,250); the long-term slice alone stacks on top at 15% (the ordinary
+  // base already clears the $48,350 0%/15% breakpoint).
+  const result = estimateTax({
+    grossIncome: 60_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    shortTermCapitalGains: 10_000,
+    qualifiedDividendsAndLTCG: 20_000,
+  });
+  const ordinaryTaxable = 60_000 + 10_000 - 15_750; // 54,250
+  const expectedOrdinaryTax =
+    11_925 * 0.1 + (48_475 - 11_925) * 0.12 + (ordinaryTaxable - 48_475) * 0.22;
+  const expectedCapGainsTax = 20_000 * 0.15;
+  check("mixed gains: ordinary slice excludes long-term gains", result.federalTaxBeforeCredits, expectedOrdinaryTax + expectedCapGainsTax);
+  check("mixed gains: preferential rate applies only to the long-term slice", result.capitalGainsTax, expectedCapGainsTax);
+
+  // Reclassifying the same $30,000 of gains as entirely long-term must cost
+  // strictly less, which is the whole point of separating the two.
+  const allLongTerm = estimateTax({
+    grossIncome: 60_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 30_000,
+  });
+  if (allLongTerm.federalTaxBeforeCredits < result.federalTaxBeforeCredits) {
+    passed++;
+    console.log(
+      `  PASS  same gains cost less when long-term (${allLongTerm.federalTaxBeforeCredits.toFixed(2)} < ${result.federalTaxBeforeCredits.toFixed(2)})`
+    );
+  } else {
+    failed++;
+    console.error("  FAIL  long-term gains should be cheaper than short-term gains");
+  }
+}
+
+{
+  // NIIT's base is *net investment income*, which includes short-term gains.
+  // Mirrors the Phase C long-term NIIT case exactly, so the two must match.
+  const result = estimateTax({
+    grossIncome: 180_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    shortTermCapitalGains: 50_000,
+  });
+  check("NIIT applies to short-term gains too", result.netInvestmentIncomeTax, 0.038 * 30_000);
+}
+
+{
+  // Both gain types in one return, with net investment income (not the MAGI
+  // excess) as the binding side — so the NIIT figure only comes out right if
+  // BOTH are in the base. Long-term alone would give 0.038 * 10,000 = $380.
+  const result = estimateTax({
+    grossIncome: 250_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 10_000,
+    shortTermCapitalGains: 15_000,
+  });
+  check("NIIT base sums short-term and long-term gains", result.netInvestmentIncomeTax, 0.038 * 25_000);
+}
+
+console.log("\n== Phase E: Additional Medicare Tax (0.9%) ==");
+{
+  // Single, $195,000 of wages: under the $200,000 threshold, so nothing due.
+  const under = estimateTax({
+    grossIncome: 195_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("no Additional Medicare Tax below the single threshold", under.additionalMedicareTax, 0);
+
+  // The same $250,000 of wages crosses the $200,000 single threshold but not
+  // the $250,000 MFJ one — proving the threshold really is status-specific.
+  const single = estimateTax({
+    grossIncome: 250_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("Additional Medicare Tax on wages over the single threshold", single.additionalMedicareTax, 0.009 * 50_000);
+
+  const mfj = estimateTax({
+    grossIncome: 250_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("same wages owe nothing at the MFJ threshold", mfj.additionalMedicareTax, 0);
+
+  const mfs = estimateTax({
+    grossIncome: 200_000,
+    filingStatus: "mfs",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check("MFS uses its own $125,000 threshold", mfs.additionalMedicareTax, 0.009 * 75_000);
+}
+
+{
+  // Self-employment earnings (92.35% of net profit) are subject to the same
+  // 0.9% surtax, and share one threshold with wages per Form 8959.
+  const seOnly = estimateTax({
+    grossIncome: 0,
+    selfEmploymentNetIncome: 300_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check(
+    "Additional Medicare Tax on self-employment earnings",
+    seOnly.additionalMedicareTax,
+    0.009 * (300_000 * 0.9235 - 200_000)
+  );
+
+  const combined = estimateTax({
+    grossIncome: 150_000,
+    selfEmploymentNetIncome: 100_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+  });
+  check(
+    "wages and self-employment earnings share one threshold",
+    combined.additionalMedicareTax,
+    0.009 * (150_000 + 100_000 * 0.9235 - 200_000)
+  );
+}
+
+{
+  // The Additional Medicare Tax and the NIIT are independent taxes on
+  // non-overlapping bases: high wages plus large investment income owes both
+  // in full, and neither reduces the other.
+  const result = estimateTax({
+    grossIncome: 300_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifiedDividendsAndLTCG: 50_000,
+  });
+  const expectedAdditionalMedicare = 0.009 * (300_000 - 200_000);
+  const expectedNiit = 0.038 * 50_000; // NII is the lesser side ($150,000 MAGI excess)
+  check("Additional Medicare Tax alongside NIIT", result.additionalMedicareTax, expectedAdditionalMedicare);
+  check("NIIT alongside Additional Medicare Tax", result.netInvestmentIncomeTax, expectedNiit);
+  check(
+    "both surtaxes are added on top of income tax",
+    result.federalTotalTaxBeforeRefundableCredits,
+    result.federalTax + result.amtAmount + result.selfEmploymentTax + expectedNiit + expectedAdditionalMedicare
+  );
+}
+
+console.log("\n== Phase E: Earned Income Tax Credit ==");
+{
+  // $20,000 of wages sits on the plateau for every child count (past the
+  // phase-in, below the $23,350 single phase-out threshold), so each case
+  // returns exactly that year's published maximum credit.
+  const base = { grossIncome: 20_000, filingStatus: "single" as const, state: "TX" as const, taxYear: 2025 as const };
+  check("EITC max, no qualifying children", estimateTax({ ...base, grossIncome: 9_000 }).earnedIncomeCredit, 649);
+  check("EITC max, one qualifying child", estimateTax({ ...base, qualifyingChildren: 1 }).earnedIncomeCredit, 4_328);
+  check("EITC max, two qualifying children", estimateTax({ ...base, qualifyingChildren: 2 }).earnedIncomeCredit, 7_152);
+  check("EITC max, three qualifying children", estimateTax({ ...base, qualifyingChildren: 3 }).earnedIncomeCredit, 8_046);
+  check("EITC treats four children the same as three", estimateTax({ ...base, qualifyingChildren: 4 }).earnedIncomeCredit, 8_046);
+}
+
+{
+  // Phase-in region: $10,000 of earned income with two children is below the
+  // $17,880 point where the 40% statutory credit rate reaches the maximum,
+  // so the credit is simply 40% of earned income.
+  const result = estimateTax({
+    grossIncome: 10_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+  });
+  check("EITC phase-in is 40% of earned income (two children)", result.earnedIncomeCredit, 0.4 * 10_000);
+}
+
+{
+  // Phase-out region: $40,000 is $16,650 past the $23,350 single threshold,
+  // reduced at the statutory 21.06% rate for two children.
+  const single = estimateTax({
+    grossIncome: 40_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+  });
+  check("EITC phase-out (single, two children)", single.earnedIncomeCredit, 7_152 - 0.2106 * (40_000 - 23_350));
+
+  // MFJ's phase-out starts $7,120 later ($30,470), so the same income keeps
+  // more of the credit.
+  const mfj = estimateTax({
+    grossIncome: 40_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+  });
+  check("EITC phase-out uses the higher MFJ threshold", mfj.earnedIncomeCredit, 7_152 - 0.2106 * (40_000 - 30_470));
+}
+
+{
+  // The §32(i) investment-income limit is a cliff, not a phase-out: $11,950
+  // of gains still leaves a (phased-out) credit, $12,000 wipes it out
+  // entirely even though earned income is unchanged.
+  const atLimit = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+    qualifiedDividendsAndLTCG: 11_950,
+  });
+  check(
+    "EITC survives investment income exactly at the limit",
+    atLimit.earnedIncomeCredit,
+    7_152 - 0.2106 * (20_000 + 11_950 - 23_350)
+  );
+
+  const overLimit = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+    qualifiedDividendsAndLTCG: 12_000,
+  });
+  check("EITC is zeroed once investment income exceeds the limit", overLimit.earnedIncomeCredit, 0);
+
+  // Short-term gains count toward that same limit.
+  const overLimitShortTerm = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+    shortTermCapitalGains: 12_000,
+  });
+  check("short-term gains count toward the EITC investment limit", overLimitShortTerm.earnedIncomeCredit, 0);
+}
+
+{
+  // Married Filing Separately is treated as ineligible (see the note in
+  // calculateEarnedIncomeCredit).
+  const result = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "mfs",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+  });
+  check("EITC is $0 for MFS", result.earnedIncomeCredit, 0);
+}
+
+{
+  // 2026 maximum credits are the inflation-adjusted Rev. Proc. 2025-32
+  // figures, not 2025's.
+  const result = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2026,
+    qualifyingChildren: 2,
+  });
+  check("2026 EITC uses the 2026 maximum credit", result.earnedIncomeCredit, 7_316);
+}
+
+{
+  // The EITC is refundable: with $20,000 of wages and two children, the
+  // Child Tax Credit already wipes out the $425 of income tax, so the whole
+  // credit becomes a refund — a negative federal total tax.
+  const result = estimateTax({
+    grossIncome: 20_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    qualifyingChildren: 2,
+  });
+  const taxBeforeCredits = (20_000 - 15_750) * 0.1;
+  check("income tax before credits", result.federalTaxBeforeCredits, taxBeforeCredits);
+  check("nonrefundable credits stop at zero", result.federalTax, 0);
+  check("refundable EITC drives federal total tax negative", result.federalTotalTax, -7_152);
+  check("take-home exceeds income by the refund", result.estimatedTakeHome, 20_000 + 7_152);
+}
+
+console.log("\n== Phase E: education credits (AOTC / LLC) ==");
+{
+  // AOTC at full value: 100% of the first $2,000 + 25% of the next $2,000 =
+  // $2,500, of which 40% ($1,000) is refundable. MAGI is far below the
+  // $80,000 phase-out floor.
+  const result = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "aotc",
+  });
+  check("AOTC nonrefundable portion (60%)", result.educationCreditNonrefundable, 2_500 * 0.6);
+  check("AOTC refundable portion (40%)", result.educationCreditRefundable, 2_500 * 0.4);
+
+  const taxBeforeCredits = 11_925 * 0.1 + (50_000 - 15_750 - 11_925) * 0.12;
+  check("AOTC nonrefundable portion reduces income tax", result.federalTax, taxBeforeCredits - 1_500);
+  check("AOTC refundable portion reduces total tax further", result.federalTotalTax, taxBeforeCredits - 1_500 - 1_000);
+
+  // Expenses beyond $4,000 add nothing — the two AOTC tiers are capped.
+  const moreExpenses = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 10_000,
+    educationCreditType: "aotc",
+  });
+  check(
+    "AOTC caps out at $2,500 regardless of extra expenses",
+    moreExpenses.educationCreditNonrefundable + moreExpenses.educationCreditRefundable,
+    2_500
+  );
+}
+
+{
+  // AOTC phase-out: $85,000 MAGI is exactly halfway through the
+  // $80,000-$90,000 single range, so half the credit survives.
+  const result = estimateTax({
+    grossIncome: 85_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "aotc",
+  });
+  check("AOTC halfway through the phase-out (nonrefundable)", result.educationCreditNonrefundable, 2_500 * 0.5 * 0.6);
+  check("AOTC halfway through the phase-out (refundable)", result.educationCreditRefundable, 2_500 * 0.5 * 0.4);
+
+  const above = estimateTax({
+    grossIncome: 95_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "aotc",
+  });
+  check("AOTC is fully phased out above $90,000", above.educationCreditNonrefundable + above.educationCreditRefundable, 0);
+
+  // MFJ's range is $160,000-$180,000, so $170,000 is its halfway point.
+  const mfj = estimateTax({
+    grossIncome: 170_000,
+    filingStatus: "mfj",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "aotc",
+  });
+  check("AOTC uses the higher MFJ phase-out range", mfj.educationCreditNonrefundable, 2_500 * 0.5 * 0.6);
+}
+
+{
+  // Lifetime Learning Credit: 20% of up to $10,000 of expenses ($2,000 max),
+  // entirely nonrefundable.
+  const result = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 10_000,
+    educationCreditType: "llc",
+  });
+  check("LLC is 20% of qualified expenses", result.educationCreditNonrefundable, 10_000 * 0.2);
+  check("LLC is never refundable", result.educationCreditRefundable, 0);
+
+  const overCap = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 15_000,
+    educationCreditType: "llc",
+  });
+  check("LLC caps expenses at $10,000", overCap.educationCreditNonrefundable, 2_000);
+
+  // Same $4,000 of expenses, different credit: the selector has to matter.
+  const llcSmall = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "single",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "llc",
+  });
+  check("LLC on $4,000 of expenses is 20%, not the AOTC formula", llcSmall.educationCreditNonrefundable, 800);
+}
+
+{
+  // Married Filing Separately can't claim either education credit.
+  const result = estimateTax({
+    grossIncome: 50_000,
+    filingStatus: "mfs",
+    state: "TX",
+    taxYear: 2025,
+    educationExpenses: 4_000,
+    educationCreditType: "aotc",
+  });
+  check("education credits are $0 for MFS", result.educationCreditNonrefundable + result.educationCreditRefundable, 0);
+}
+
+{
+  // Backward compatibility: with none of the Phase E inputs supplied, every
+  // new figure is zero and the bottom line is unchanged from the pre-Phase-E
+  // "total tax" definition.
+  const result = estimateTax({
+    grossIncome: 75_000,
+    filingStatus: "single",
+    state: "CA",
+    taxYear: 2025,
+  });
+  check("no short-term gains by default", result.shortTermCapitalGains, 0);
+  check("no Additional Medicare Tax by default", result.additionalMedicareTax, 0);
+  check("no EITC by default at this income", result.earnedIncomeCredit, 0);
+  check("no education credit by default", result.educationCreditNonrefundable + result.educationCreditRefundable, 0);
+  check("no refundable credits by default", result.refundableCreditsTotal, 0);
+  check(
+    "federal total tax is unchanged when no Phase E input applies",
+    result.federalTotalTax,
+    result.federalTotalTaxBeforeRefundableCredits
+  );
+}
+
 console.log(`\n${passed} passed, ${failed} failed`);
 if (failed > 0) {
   process.exit(1);

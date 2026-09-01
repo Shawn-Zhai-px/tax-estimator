@@ -5,7 +5,15 @@ import { formatCurrency } from "@/lib/format";
 
 interface AnnualScheduleTableProps {
   result: AnnualScheduleResult;
+  /** Whether CA withholding was applied — hides the CA-specific columns entirely (rather than showing an all-$0 "CA State Tax" column) when it wasn't. */
+  applyCA: boolean;
 }
+
+const CA_ONLY_COLUMN_KEYS = new Set<Column["key"]>([
+  "caStateIncTaxWithheld",
+  "caSdiWithheld",
+  "caTaxableIncomeAnnual",
+]);
 
 interface Column {
   key: keyof ScheduleRow | "totals";
@@ -160,13 +168,14 @@ const columns: Column[] = [
   },
 ];
 
-export default function AnnualScheduleTable({ result }: AnnualScheduleTableProps) {
+export default function AnnualScheduleTable({ result, applyCA }: AnnualScheduleTableProps) {
+  const visibleColumns = applyCA ? columns : columns.filter((col) => !CA_ONLY_COLUMN_KEYS.has(col.key));
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
       <table className="min-w-full divide-y divide-slate-200 text-xs">
         <thead>
           <tr className="text-left uppercase tracking-wide text-slate-500">
-            {columns.map((col, i) => (
+            {visibleColumns.map((col, i) => (
               <th
                 key={col.key}
                 title={col.title}
@@ -184,7 +193,7 @@ export default function AnnualScheduleTable({ result }: AnnualScheduleTableProps
             const rowBg = row.type === "BONUS" ? "bg-amber-50" : "bg-white";
             return (
               <tr key={row.eventNum} className={row.type === "BONUS" ? "font-medium bg-amber-50" : ""}>
-                {columns.map((col, i) => (
+                {visibleColumns.map((col, i) => (
                   <td
                     key={col.key}
                     className={`whitespace-nowrap py-2 px-3 ${
@@ -200,7 +209,7 @@ export default function AnnualScheduleTable({ result }: AnnualScheduleTableProps
         </tbody>
         <tfoot>
           <tr className="border-t-2 border-slate-300 bg-slate-50 font-semibold">
-            {columns.map((col, i) => (
+            {visibleColumns.map((col, i) => (
               <td
                 key={col.key}
                 className={`whitespace-nowrap py-2 px-3 ${

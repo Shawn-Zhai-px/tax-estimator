@@ -13,6 +13,15 @@ function toRow(values: (string | number)[]): string {
   return values.map(csvEscape).join(",");
 }
 
+// Positions of the CA-specific columns in HEADER (and in every row/total
+// array below, which follow the same column order) — omitted entirely when
+// CA withholding wasn't applied, rather than shown as an all-$0 column.
+const CA_ONLY_COLUMN_INDICES = [15, 16, 21];
+
+function omitCaColumns<T>(row: T[], applyCA: boolean): T[] {
+  return applyCA ? row : row.filter((_, i) => !CA_ONLY_COLUMN_INDICES.includes(i));
+}
+
 const HEADER = [
   "Event #",
   "Type",
@@ -38,17 +47,17 @@ const HEADER = [
   "CA Taxable Income (annual)",
 ];
 
-export function exportScheduleToCsv(result: AnnualScheduleResult, payFrequency: PayFrequency) {
+export function exportScheduleToCsv(result: AnnualScheduleResult, payFrequency: PayFrequency, applyCA: boolean) {
   const rows: string[] = [];
 
   rows.push(toRow([`Paycheck Withholding Schedule (${PAYCHECK_TAX_YEAR}, reference only, not tax advice)`]));
   rows.push(toRow(["Pay periods per year", result.periodsPerYear]));
   rows.push("");
-  rows.push(toRow(HEADER));
+  rows.push(toRow(omitCaColumns(HEADER, applyCA)));
 
   for (const row of result.rows) {
     rows.push(
-      toRow([
+      toRow(omitCaColumns([
         row.eventNum,
         row.type,
         row.regPaycheckNum ?? "",
@@ -71,13 +80,13 @@ export function exportScheduleToCsv(result: AnnualScheduleResult, payFrequency: 
         row.fedCaTaxableWages.toFixed(2),
         row.fedAdjustedAnnualWage === null ? "N/A" : row.fedAdjustedAnnualWage.toFixed(2),
         row.caTaxableIncomeAnnual === null ? "N/A" : row.caTaxableIncomeAnnual.toFixed(2),
-      ])
+      ], applyCA))
     );
   }
 
   const t = result.totals;
   rows.push(
-    toRow([
+    toRow(omitCaColumns([
       "",
       "ANNUAL TOTAL",
       "",
@@ -100,7 +109,7 @@ export function exportScheduleToCsv(result: AnnualScheduleResult, payFrequency: 
       t.fedCaTaxableWages.toFixed(2),
       "",
       "",
-    ])
+    ], applyCA))
   );
 
   rows.push("");

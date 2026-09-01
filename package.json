@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx src/lib/__tests__/calculateTax.test.ts"
+    "test": "tsx src/lib/__tests__/calculateTax.test.ts && tsx src/lib/__tests__/calculatePaycheck.test.ts"
   },
   "dependencies": {
     "next": "^14.2.5",

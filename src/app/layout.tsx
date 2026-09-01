@@ -1,10 +1,25 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+const title = "Federal & State Tax Tools — Income Tax & Paycheck Withholding Estimator";
+const description =
+  "Free federal and California/Texas income tax and paycheck withholding estimator. No account, no sign-up, no personal information collected — every figure is computed in your browser. Reference only, not tax advice.";
+
 export const metadata: Metadata = {
-  title: "联邦/州个税估算工具 (参考用途)",
-  description:
-    "估算联邦及州个人所得税（目前支持加州与德州），仅供参考，不构成税务建议。",
+  title,
+  description,
+  robots: { index: true, follow: true },
+  openGraph: {
+    title,
+    description,
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary",
+    title,
+    description,
+  },
 };
 
 export default function RootLayout({
@@ -13,7 +28,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang="en">
       <body>{children}</body>
     </html>
   );
